@@ -110,3 +110,32 @@ export function translateWeather(weather: string): string {
   if (!weather) return '';
   return WEATHER_TRANSLATIONS[weather] || weather;
 }
+
+export const METHOD_TRANSLATIONS: Record<string, string> = {
+  'Non-overworld': 'Hierba alta (!)',
+  'Overworld': 'Visible en el mapa',
+  'Fishing': 'Pesca',
+  'Surfing': 'Surf / Agua',
+  'Surfing / Water': 'Surf / Agua',
+  'Shake Tree': 'Árbol de bayas',
+  'Berry Tree': 'Árbol de bayas',
+  'Wanderer': 'Pokémon Errante',
+  'Flying': 'En vuelo',
+  'Curry': 'Campamento (Curry)',
+  'Grass': 'Hierba',
+  'Cave': 'Cueva',
+  'Old Rod': 'Caña vieja',
+  'Good Rod': 'Caña buena',
+  'Super Rod': 'Supercaña',
+  'Rock Smash': 'Golpe roca',
+  'Headbutt': 'Golpe cabeza',
+  'Gift': 'Regalo',
+};
+
+/**
+ * Translates encounter method strings to Spanish
+ */
+export function translateMethod(method: string): string {
+  if (!method) return '';
+  return METHOD_TRANSLATIONS[method] || method;
+}

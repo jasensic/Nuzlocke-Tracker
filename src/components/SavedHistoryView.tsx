@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SavedEncounter } from '../types';
+import { SavedEncounter, GameTenant } from '../types';
 import { parsePokemonName, TYPE_COLORS, getPokemonSprite } from '../utils/pokemonMeta';
 import { translateRouteName } from '../data/routeTranslations';
 import {
@@ -15,6 +15,7 @@ import {
   Edit3,
   Check,
   X,
+  Gamepad2,
 } from 'lucide-react';
 
 interface SavedHistoryViewProps {
@@ -22,6 +23,8 @@ interface SavedHistoryViewProps {
   onUpdate: (id: string, updates: Partial<SavedEncounter>) => void;
   onDelete: (id: string) => void;
   onClearAll: () => void;
+  activeTenant?: GameTenant;
+  onOpenTenantModal?: () => void;
 }
 
 export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
@@ -29,6 +32,8 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
   onUpdate,
   onDelete,
   onClearAll,
+  activeTenant,
+  onOpenTenantModal,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -129,12 +134,26 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm transition-colors">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-              <Compass className="w-5 h-5 text-red-500" />
-              Bitácora de Encuentros Guardados
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Registro histórico de tus Pokémon elegidos por ruta en esta partida.
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                <Compass className="w-5 h-5 text-red-500" />
+                Bitácora de Encuentros
+              </h2>
+              {activeTenant && (
+                <button
+                  type="button"
+                  onClick={onOpenTenantModal}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
+                  title="Cambiar base de datos"
+                >
+                  <Gamepad2 className="w-3 h-3" />
+                  <span>{activeTenant.shortName || activeTenant.name} ({activeTenant.region})</span>
+                  <span className="text-[10px] text-emerald-500 underline ml-0.5">Cambiar</span>
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Registro histórico de tus Pokémon elegidos por ruta para {activeTenant?.name || 'esta partida'}.
             </p>
           </div>
 
@@ -201,23 +220,23 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
 
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Encuentros Totales</span>
-            <p className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-0.5">{totalCount}</p>
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">Encuentros Totales</span>
+            <p className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{totalCount}</p>
           </div>
-          <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40">
-            <span className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Capturados / Vivos</span>
-            <p className="text-2xl font-black text-emerald-800 dark:text-emerald-300 mt-0.5">{caughtCount}</p>
+          <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/70 shadow-2xs">
+            <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">Capturados / Vivos</span>
+            <p className="text-2xl font-black text-emerald-900 dark:text-emerald-300 mt-0.5">{caughtCount}</p>
           </div>
-          <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40">
-            <span className="text-xs text-indigo-700 dark:text-indigo-400 font-medium">Rutas Exploradas</span>
-            <p className="text-2xl font-black text-indigo-800 dark:text-indigo-300 mt-0.5">{routesCount}</p>
+          <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/70 shadow-2xs">
+            <span className="text-xs text-indigo-700 dark:text-indigo-400 font-bold">Rutas Exploradas</span>
+            <p className="text-2xl font-black text-indigo-900 dark:text-indigo-300 mt-0.5">{routesCount}</p>
           </div>
-          <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/40">
-            <span className="text-xs text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1">
+          <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/70 shadow-2xs">
+            <span className="text-xs text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5" /> Variocolor (Shinies)
             </span>
-            <p className="text-2xl font-black text-amber-800 dark:text-amber-300 mt-0.5">{shinyCount}</p>
+            <p className="text-2xl font-black text-amber-900 dark:text-amber-300 mt-0.5">{shinyCount}</p>
           </div>
         </div>
       </div>
@@ -232,7 +251,7 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
             placeholder="Buscar por Pokémon o mote..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-850 focus:outline-none focus:ring-2 focus:ring-red-500/20 font-medium"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/20 font-medium"
           />
         </div>
 
@@ -281,7 +300,7 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
           {filteredHistory.map((item) => {
             const { displayName, types } = parsePokemonName(item.pokemon);
             const { sprite } = getPokemonSprite(item.pokemon);
@@ -291,15 +310,15 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
               <div
                 key={item.id}
                 id={`history-item-${item.id}`}
-                className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col justify-between"
+                className="bg-white dark:bg-slate-800/90 rounded-2xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all relative overflow-hidden flex flex-col justify-between"
               >
                 {/* Header: Route & Date */}
-                <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                    <Compass className="w-3.5 h-3.5 text-red-500" />
-                    {translateRouteName(item.routeName)}
+                <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100 dark:border-slate-700/60">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Compass className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                    <span className="truncate">{translateRouteName(item.routeName)}</span>
                   </span>
-                  <span className="text-slate-400 dark:text-slate-500 flex items-center gap-1 text-[11px]">
+                  <span className="text-slate-400 dark:text-slate-400 flex items-center gap-1 text-[11px] flex-shrink-0">
                     <Calendar className="w-3 h-3" />
                     {new Date(item.timestamp).toLocaleDateString()}
                   </span>
@@ -307,11 +326,11 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
 
                 {/* Content */}
                 <div className="py-3 flex items-start gap-3">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-750 flex items-center justify-center p-1 relative flex-shrink-0">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 relative flex-shrink-0">
                     <img
                       src={sprite}
                       alt={displayName}
-                      className="w-14 h-14 object-contain"
+                      className="w-12 h-12 sm:w-14 sm:h-14 object-contain"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.opacity = '0.3';
                       }}
@@ -325,12 +344,12 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                      <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
                         {item.nickname ? `${item.nickname} (${displayName})` : displayName}
                       </h4>
                     </div>
 
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <span
                         className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
                           statusColors[item.status]
@@ -338,18 +357,18 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
                       >
                         {item.status}
                       </span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] text-slate-600 dark:text-slate-300 font-semibold bg-slate-100 dark:bg-slate-700/80 border border-slate-200/80 dark:border-slate-600 px-2 py-0.5 rounded-full">
                         {item.method} • {item.chance}%
                       </span>
                       {item.levelRange && (
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] text-slate-600 dark:text-slate-300 font-semibold bg-slate-100 dark:bg-slate-700/80 border border-slate-200/80 dark:border-slate-600 px-2 py-0.5 rounded-full">
                           {item.levelRange}
                         </span>
                       )}
                     </div>
 
                     {item.notes && (
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 bg-slate-50 dark:bg-slate-800/70 p-2 rounded-xl italic border border-slate-100 dark:border-slate-750">
+                      <p className="text-xs text-slate-700 dark:text-slate-200 mt-2 bg-slate-50 dark:bg-slate-900/70 p-2.5 rounded-xl italic border border-slate-200/80 dark:border-slate-700">
                         &ldquo;{item.notes}&rdquo;
                       </p>
                     )}
@@ -358,7 +377,7 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
 
                 {/* Inline Editing Form if active */}
                 {isEditing && (
-                  <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
+                  <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-slate-500 dark:text-slate-400 font-medium mb-1">Mote</label>
@@ -414,7 +433,7 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
 
                 {/* Footer action buttons */}
                 {!isEditing && (
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60 text-xs">
                     <button
                       type="button"
                       onClick={() => handleStartEdit(item)}

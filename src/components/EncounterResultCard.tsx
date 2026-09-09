@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { RouteEncounter, SavedEncounter } from '../types';
 import { parsePokemonName, TYPE_COLORS, getPokemonSprite } from '../utils/pokemonMeta';
 import { translateWeather } from '../data/routeTranslations';
-import { Sparkles, BookmarkCheck, Check, ShieldAlert, Heart, Box, Wind, Compass } from 'lucide-react';
+import { Sparkles, BookmarkCheck, Check, ShieldAlert, Heart, Box, Wind, Compass, Hand } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sfx } from '../utils/audio';
 
@@ -13,6 +13,7 @@ interface EncounterResultCardProps {
   routeId: string;
   onSave: (saved: SavedEncounter) => void;
   isAlreadySaved?: boolean;
+  selectionMode?: 'random' | 'manual';
 }
 
 export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
@@ -21,6 +22,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
   routeId,
   onSave,
   isAlreadySaved = false,
+  selectionMode = 'random',
 }) => {
   const { displayName, cleanName, formLabel, types } = parsePokemonName(encounter.pokemon);
   const { sprite, showdown } = getPokemonSprite(encounter.pokemon);
@@ -92,6 +94,12 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
           </span>
         </div>
         <div className="flex items-center space-x-2">
+          {selectionMode === 'manual' && (
+            <span className="px-2.5 py-0.5 text-xs font-black rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/50 flex items-center gap-1 shadow-xs">
+              <Hand className="w-3 h-3 text-amber-300" />
+              Elegido a Dedo
+            </span>
+          )}
           <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${rarity.color} bg-white/10 text-white border-white/20`}>
             {encounter.chance}% ({rarity.label})
           </span>
@@ -172,34 +180,36 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
 
             {/* Badges for Weather, Method & Levels */}
             <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-              <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/80">
-                <span className="text-slate-400 dark:text-slate-400 block font-medium">Método</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  {encounter.method === 'Hidden'
-                    ? 'Hierba Oculta (!)'
-                    : encounter.method === 'Visible'
-                    ? 'Sobrehierba Visible'
-                    : encounter.method === 'Fishing'
-                    ? 'Pesca con Caña'
-                    : encounter.method === 'Surfing'
-                    ? 'Navegando (Surf)'
-                    : encounter.method}
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
+                <span className="text-slate-500 dark:text-slate-400 block font-medium">Método</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                  <span className="truncate">
+                    {encounter.method === 'Hidden'
+                      ? 'Hierba Oculta (!)'
+                      : encounter.method === 'Visible'
+                      ? 'Sobrehierba Visible'
+                      : encounter.method === 'Fishing'
+                      ? 'Pesca con Caña'
+                      : encounter.method === 'Surfing'
+                      ? 'Navegando (Surf)'
+                      : encounter.method}
+                  </span>
                 </span>
               </div>
 
-              <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/80">
-                <span className="text-slate-400 dark:text-slate-400 block font-medium">Clima Requerido</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 mt-0.5">
-                  <Wind className="w-3.5 h-3.5 text-blue-500" />
-                  {translateWeather(encounter.weather)}
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
+                <span className="text-slate-500 dark:text-slate-400 block font-medium">Clima Requerido</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mt-0.5">
+                  <Wind className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                  <span className="truncate">{translateWeather(encounter.weather)}</span>
                 </span>
               </div>
 
               {encounter.levelRange && (
-                <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/80 col-span-2">
-                  <span className="text-slate-400 dark:text-slate-400 block font-medium">Rango de Nivel</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-200">{encounter.levelRange}</span>
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 col-span-2">
+                  <span className="text-slate-500 dark:text-slate-400 block font-medium">Rango de Nivel</span>
+                  <span className="font-black text-slate-900 dark:text-slate-100">{encounter.levelRange}</span>
                 </div>
               )}
             </div>
@@ -229,7 +239,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
                 placeholder="Ej. Chispa, Rocky..."
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-850 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
               />
             </div>
 
@@ -242,7 +252,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
                 id="pokemon-status-select"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as SavedEncounter['status'])}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-850 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all font-medium cursor-pointer"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all font-medium cursor-pointer"
               >
                 <option value="Capturado">🎯 Capturado</option>
                 <option value="En Equipo">⭐ En Equipo</option>
@@ -263,7 +273,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
                 placeholder="Ej. Primer encuentro de ruta según reglas Nuzlocke."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-850 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
               />
             </div>
           </div>

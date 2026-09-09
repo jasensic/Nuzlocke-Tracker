@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { getRoutes } from './data/encounterParser';
 import { translateRouteName } from './data/routeTranslations';
-import { RouteData, RouteEncounter, SavedEncounter, EncounterMethod } from './types';
+import {
+  getBuiltInTenants,
+  loadCustomTenants,
+  saveCustomTenants,
+  getHistoryStorageKey,
+  ACTIVE_TENANT_KEY,
+} from './data/tenantRegistry';
+import { RouteData, RouteEncounter, SavedEncounter, EncounterMethod, GameTenant } from './types';
 import { PokeballSpinner } from './components/PokeballSpinner';
 import { EncounterWheel } from './components/EncounterWheel';
 import { EncounterResultCard } from './components/EncounterResultCard';
@@ -9,6 +15,9 @@ import { QuickRouteBar } from './components/QuickRouteBar';
 import { RouteFilters } from './components/RouteFilters';
 import { SavedHistoryView } from './components/SavedHistoryView';
 import { RouteDatabaseView } from './components/RouteDatabaseView';
+import { GameTenantModal } from './components/GameTenantModal';
+import { GameTenantSelector } from './components/GameTenantSelector';
+import { ManualPokemonPickerModal } from './components/ManualPokemonPickerModal';
 import { sfx } from './utils/audio';
 import {
   Sparkles,
@@ -23,14 +32,39 @@ import {
   Moon,
   SlidersHorizontal,
   ChevronDown,
+  Gamepad2,
+  Hand,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-const STORAGE_KEY = 'pokemon_route_encounters_v1';
 const THEME_KEY = 'pokemon_tracker_theme_v1';
 
 export default function App() {
-  const allRoutes = useMemo(() => getRoutes(), []);
+  // Multi-Tenancy State (Bases de datos de juegos y mods)
+  const [customTenants, setCustomTenants] = useState<GameTenant[]>(() => loadCustomTenants());
+  const allTenants = useMemo(() => {
+    return [...getBuiltInTenants(), ...customTenants];
+  }, [customTenants]);
+
+  const [activeTenantId, setActiveTenantId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(ACTIVE_TENANT_KEY);
+      if (saved) return saved;
+    } catch {}
+    return 'blessed-shield';
+  });
+
+  const activeTenant = useMemo(() => {
+    return allTenants.find((t) => t.id === activeTenantId) || allTenants[0];
+  }, [allTenants, activeTenantId]);
+
+  const allRoutes = useMemo(() => {
+    return activeTenant?.routes || [];
+  }, [activeTenant]);
+
+  const [isTenantModalOpen, setIsTenantModalOpen] = useState<boolean>(false);
+  const [isManualPickerOpen, setIsManualPickerOpen] = useState<boolean>(false);
+  const [selectionMode, setSelectionMode] = useState<'random' | 'manual'>('random');
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<'roulette' | 'history' | 'database'>('roulette');
@@ -60,7 +94,7 @@ export default function App() {
   }, [isDarkMode]);
 
   // Selected filters
-  const [selectedRouteId, setSelectedRouteId] = useState<string>(allRoutes[0]?.id || 'route-1');
+  const [selectedRouteId, setSelectedRouteId] = useState<string>(() => allRoutes[0]?.id || 'route-1');
   const [selectedWeather, setSelectedWeather] = useState<string>('All');
   const [selectedMethod, setSelectedMethod] = useState<EncounterMethod | 'All'>('All');
   const [isWeighted, setIsWeighted] = useState<boolean>(true);
@@ -72,10 +106,18 @@ export default function App() {
   // Sound toggle
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
-  // Saved history from LocalStorage with automatic Spanish route name migration
+  // Synchronize route when routes change (e.g. game tenant switched)
+  useEffect(() => {
+    if (!allRoutes.some((r) => r.id === selectedRouteId)) {
+      setSelectedRouteId(allRoutes[0]?.id || '');
+    }
+  }, [allRoutes, selectedRouteId]);
+
+  // Saved history isolated per tenant
   const [history, setHistory] = useState<SavedEncounter[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const storageKey = getHistoryStorageKey(activeTenantId);
+      const saved = localStorage.getItem(storageKey);
       if (!saved) return [];
       const parsed: SavedEncounter[] = JSON.parse(saved);
       return parsed.map((item) => ({
@@ -87,14 +129,62 @@ export default function App() {
     }
   });
 
-  // Save history updates to LocalStorage
+  // When active tenant changes, reload that tenant's history
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      const storageKey = getHistoryStorageKey(activeTenantId);
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed: SavedEncounter[] = JSON.parse(saved);
+        setHistory(
+          parsed.map((item) => ({
+            ...item,
+            routeName: translateRouteName(item.routeName),
+          }))
+        );
+      } else {
+        setHistory([]);
+      }
+    } catch {
+      setHistory([]);
+    }
+  }, [activeTenantId]);
+
+  // Save history updates to LocalStorage under current tenant key
+  useEffect(() => {
+    try {
+      const storageKey = getHistoryStorageKey(activeTenantId);
+      localStorage.setItem(storageKey, JSON.stringify(history));
     } catch {
       // Storage full or quota exceeded
     }
-  }, [history]);
+  }, [history, activeTenantId]);
+
+  // Tenant management handlers
+  const handleSelectTenant = (tenantId: string) => {
+    setActiveTenantId(tenantId);
+    try {
+      localStorage.setItem(ACTIVE_TENANT_KEY, tenantId);
+    } catch {}
+    setSelectedEncounter(null);
+    setActiveCandidate(null);
+  };
+
+  const handleAddCustomTenant = (newTenant: GameTenant) => {
+    const updated = [...customTenants.filter((t) => t.id !== newTenant.id), newTenant];
+    setCustomTenants(updated);
+    saveCustomTenants(updated);
+    handleSelectTenant(newTenant.id);
+  };
+
+  const handleDeleteCustomTenant = (tenantId: string) => {
+    const updated = customTenants.filter((t) => t.id !== tenantId);
+    setCustomTenants(updated);
+    saveCustomTenants(updated);
+    if (activeTenantId === tenantId) {
+      handleSelectTenant('blessed-shield');
+    }
+  };
 
   // Current active route object
   const currentRoute = useMemo(() => {
@@ -134,6 +224,7 @@ export default function App() {
   const handleRoll = () => {
     if (availableEncounters.length === 0 || isSpinning) return;
 
+    setSelectionMode('random');
     setIsSpinning(true);
     setSelectedEncounter(null);
 
@@ -195,6 +286,30 @@ export default function App() {
     }, 85);
   };
 
+  // Choose Pokémon by hand ("a dedo")
+  const handleSelectManualPokemon = (chosen: RouteEncounter) => {
+    if (isSpinning) return;
+    setSelectionMode('manual');
+    setSelectedEncounter(chosen);
+    setActiveCandidate(chosen.pokemon);
+
+    sfx.playReveal();
+    confetti({
+      particleCount: 60,
+      spread: 65,
+      origin: { y: 0.6 },
+      colors: ['#f59e0b', '#ef4444', '#10b981'],
+    });
+
+    // Auto-scroll gently to the encounter result card
+    setTimeout(() => {
+      const el = document.getElementById('encounter-result-card');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 120);
+  };
+
   // Clean up interval on unmount
   useEffect(() => {
     return () => {
@@ -221,11 +336,12 @@ export default function App() {
     setHistory((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Clear all history
+  // Clear all history for current tenant
   const handleClearHistory = () => {
     setHistory([]);
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      const storageKey = getHistoryStorageKey(activeTenantId);
+      localStorage.removeItem(storageKey);
     } catch {
       // Ignore
     }
@@ -237,74 +353,82 @@ export default function App() {
       <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/90 dark:border-slate-800 shadow-xs transition-colors">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3.5 flex flex-col gap-2.5">
           {/* Main Top Row: Brand + Controls */}
-          <div className="flex items-center justify-between gap-3">
-            {/* Brand Logo */}
+          <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+            {/* Brand Logo & Dynamic Title */}
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 flex items-center justify-center shadow-md shadow-red-500/30 text-white font-bold text-lg select-none flex-shrink-0">
                 <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-slate-900 block" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm sm:text-lg font-black tracking-tight text-slate-900 dark:text-white leading-tight truncate">
-                  Nuzlocke Pokemon Blessed Shield
-                </h1>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hidden md:block truncate">
-                  Ruleta de encuentros oficiales y bitácora de ruta para Galar
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm sm:text-base md:text-lg font-black tracking-tight text-slate-900 dark:text-white leading-tight truncate">
+                    {activeTenant.name}
+                  </h1>
+                </div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hidden sm:block truncate">
+                  Ruleta de encuentros oficiales • {activeTenant.region} ({activeTenant.generation})
                 </p>
               </div>
             </div>
 
-            {/* Desktop Navigation Tabs */}
-            <nav className="hidden md:flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
-              <button
-                id="tab-roulette-button"
-                type="button"
-                onClick={() => setActiveTab('roulette')}
-                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                  activeTab === 'roulette'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Dice5 className="w-3.5 h-3.5 text-red-500" />
-                <span>Ruleta</span>
-              </button>
+            {/* Tenant Selector & Quick Action Controls */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
+              {/* Multi-Tenancy Game Selector Button */}
+              <GameTenantSelector
+                activeTenant={activeTenant}
+                onClick={() => setIsTenantModalOpen(true)}
+              />
 
-              <button
-                id="tab-history-button"
-                type="button"
-                onClick={() => setActiveTab('history')}
-                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 relative ${
-                  activeTab === 'history'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <BookmarkCheck className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Bitácora</span>
-                {history.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-extrabold rounded-full">
-                    {history.length}
-                  </span>
-                )}
-              </button>
+              {/* Desktop Navigation Tabs */}
+              <nav className="hidden md:flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                <button
+                  id="tab-roulette-button"
+                  type="button"
+                  onClick={() => setActiveTab('roulette')}
+                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                    activeTab === 'roulette'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Dice5 className="w-3.5 h-3.5 text-red-500" />
+                  <span>Ruleta</span>
+                </button>
 
-              <button
-                id="tab-database-button"
-                type="button"
-                onClick={() => setActiveTab('database')}
-                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                  activeTab === 'database'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Base de Datos</span>
-              </button>
-            </nav>
+                <button
+                  id="tab-history-button"
+                  type="button"
+                  onClick={() => setActiveTab('history')}
+                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 relative ${
+                    activeTab === 'history'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <BookmarkCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Bitácora</span>
+                  {history.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-extrabold rounded-full">
+                      {history.length}
+                    </span>
+                  )}
+                </button>
 
-            {/* Quick Action Controls (Sound & Dark Mode) */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <button
+                  id="tab-database-button"
+                  type="button"
+                  onClick={() => setActiveTab('database')}
+                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                    activeTab === 'database'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Base de Datos</span>
+                </button>
+              </nav>
+
               {/* Dark Mode Toggle */}
               <button
                 id="theme-toggle-button"
@@ -408,7 +532,7 @@ export default function App() {
             {/* 2. PRIMARY HERO: The Interactive Pokemon Selection Stage */}
             <div
               id="roulette-interactive-stage"
-              className="bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-850 rounded-3xl p-6 sm:p-9 border border-slate-200/90 dark:border-slate-800 shadow-md flex flex-col items-center justify-center text-center relative overflow-hidden transition-colors"
+              className="bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-950 rounded-3xl p-6 sm:p-9 border border-slate-200/90 dark:border-slate-800 shadow-md flex flex-col items-center justify-center text-center relative overflow-hidden transition-colors"
             >
               {/* Background ambient decor */}
               <div className="absolute top-0 right-0 w-80 h-80 bg-red-500/5 dark:bg-red-500/10 rounded-full blur-3xl -z-0 pointer-events-none" />
@@ -438,27 +562,41 @@ export default function App() {
                 </div>
               )}
 
-              {/* Roll Action Button */}
-              <div className="relative z-10 mt-5 w-full max-w-sm">
+              {/* Roll Action Button & Manual Pick ("A Dedo") */}
+              <div className="relative z-10 mt-5 w-full max-w-md flex flex-col sm:flex-row items-center justify-center gap-2.5">
                 <button
                   id="roll-pokemon-button"
                   type="button"
                   onClick={handleRoll}
                   disabled={isSpinning || availableEncounters.length === 0}
-                  className={`w-full py-4 px-6 rounded-2xl font-black text-base uppercase tracking-wider shadow-xl transition-all duration-200 flex items-center justify-center gap-2 ${
+                  className={`w-full sm:flex-1 py-3.5 sm:py-4 px-5 rounded-2xl font-black text-sm sm:text-base uppercase tracking-wider shadow-xl transition-all duration-200 flex items-center justify-center gap-2 ${
                     isSpinning
                       ? 'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-not-allowed'
                       : availableEncounters.length === 0
                       ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.98] text-white shadow-red-600/30'
+                      : 'bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.98] text-white shadow-red-600/30 cursor-pointer'
                   }`}
                 >
                   <Sparkles className={`w-5 h-5 ${isSpinning ? 'animate-spin' : ''}`} />
-                  {isSpinning
-                    ? '¡Girando Ruleta...!'
-                    : availableEncounters.length === 0
-                    ? 'Sin Pokémon con estos filtros'
-                    : '¡Elegir Pokémon Aleatorio!'}
+                  <span>
+                    {isSpinning
+                      ? '¡Girando Ruleta...!'
+                      : availableEncounters.length === 0
+                      ? 'Sin Pokémon disponibles'
+                      : 'Girar Ruleta'}
+                  </span>
+                </button>
+
+                <button
+                  id="manual-pick-pokemon-button"
+                  type="button"
+                  onClick={() => setIsManualPickerOpen(true)}
+                  disabled={isSpinning || currentRoute.encounters.length === 0}
+                  title="Elegir manualmente a dedo un Pokémon de esta ruta"
+                  className="w-full sm:w-auto py-3.5 sm:py-4 px-5 rounded-2xl font-black text-sm sm:text-base uppercase tracking-wider border-2 border-amber-500/80 bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-amber-700 dark:text-amber-300 shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                >
+                  <Hand className="w-5 h-5 text-amber-500" />
+                  <span>Elegir a Dedo</span>
                 </button>
               </div>
 
@@ -540,7 +678,7 @@ export default function App() {
               />
             )}
 
-            {/* 4. Revealed Result Card: Visible immediately after spin */}
+            {/* 4. Revealed Result Card: Visible immediately after spin or manual pick */}
             {selectedEncounter && (
               <div className="flex justify-center pt-1">
                 <EncounterResultCard
@@ -548,6 +686,7 @@ export default function App() {
                   routeName={currentRoute.name}
                   routeId={currentRoute.id}
                   onSave={handleSaveEncounter}
+                  selectionMode={selectionMode}
                 />
               </div>
             )}
@@ -598,6 +737,8 @@ export default function App() {
             onUpdate={handleUpdateEncounter}
             onDelete={handleDeleteEncounter}
             onClearAll={handleClearHistory}
+            activeTenant={activeTenant}
+            onOpenTenantModal={() => setIsTenantModalOpen(true)}
           />
         )}
 
@@ -606,6 +747,8 @@ export default function App() {
           <RouteDatabaseView
             routes={allRoutes}
             history={history}
+            activeTenant={activeTenant}
+            onOpenTenantModal={() => setIsTenantModalOpen(true)}
             onSelectRouteForRoll={(routeId) => {
               setSelectedRouteId(routeId);
               setActiveTab('roulette');
@@ -613,6 +756,30 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Multi-Tenancy Game Selector & Management Modal */}
+      <GameTenantModal
+        isOpen={isTenantModalOpen}
+        onClose={() => setIsTenantModalOpen(false)}
+        tenants={allTenants}
+        activeTenantId={activeTenantId}
+        onSelectTenant={handleSelectTenant}
+        onAddCustomTenant={handleAddCustomTenant}
+        onDeleteCustomTenant={handleDeleteCustomTenant}
+        history={history}
+      />
+
+      {/* Manual Pokemon Picker Modal ("Elegir a dedo") */}
+      {currentRoute && (
+        <ManualPokemonPickerModal
+          isOpen={isManualPickerOpen}
+          onClose={() => setIsManualPickerOpen(false)}
+          currentRoute={currentRoute}
+          availableEncounters={availableEncounters}
+          history={history}
+          onSelectPokemon={handleSelectManualPokemon}
+        />
+      )}
 
       {/* Footer */}
       <footer className="bg-white dark:bg-slate-900 border-t border-slate-200/90 dark:border-slate-800 py-6 text-center text-xs text-slate-400 dark:text-slate-500 transition-colors">

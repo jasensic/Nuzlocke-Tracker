@@ -20,7 +20,7 @@ export const EncounterWheel: React.FC<EncounterWheelProps> = ({ isSpinning, acti
       id="encounter-wheel-preview"
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/70 dark:bg-slate-850/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-700/80 shadow-inner w-full max-w-sm transition-colors"
+      className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/90 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-md w-full max-w-sm transition-colors"
     >
       <div className="relative w-28 h-28 flex items-center justify-center">
         {isSpinning ? (

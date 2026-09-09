@@ -158,7 +158,7 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
   return (
     <div
       id="route-filters-carousel-panel"
-      className="w-full bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border-2 border-slate-200 dark:border-slate-800 shadow-lg space-y-5 transition-all animate-fadeIn"
+      className="w-full bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-5 transition-all animate-fadeIn"
     >
       {/* Header with Title and Close Button */}
       <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -234,10 +234,10 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
                 key={weatherKey}
                 type="button"
                 onClick={() => onWeatherChange(weatherKey)}
-                className={`flex-shrink-0 min-w-[130px] p-3 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-2 select-none ${
+                className={`flex-shrink-0 min-w-[130px] p-3 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2 select-none ${
                   isSelected
-                    ? 'border-blue-600 bg-blue-50/90 dark:bg-blue-950/60 shadow-md ring-2 ring-blue-500/20 text-blue-950 dark:text-blue-100'
-                    : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                    ? 'border-blue-500 bg-blue-50/90 dark:bg-blue-950/60 shadow-xs ring-1 ring-blue-500/20 text-blue-950 dark:text-blue-100'
+                    : 'border-slate-200 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -261,7 +261,7 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
                   </span>
                 </div>
                 <div>
-                  <div className="font-extrabold text-xs truncate">{weatherLabel}</div>
+                  <div className="font-black text-xs truncate">{weatherLabel}</div>
                   <div className="text-[10px] opacity-70 font-medium">
                     {isSelected ? '✓ Seleccionado' : 'Tocar para activar'}
                   </div>
@@ -302,10 +302,10 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
                   key={methodKey}
                   type="button"
                   onClick={() => onMethodChange(methodKey)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 ${
                     isSelected
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
                   <span>{label}</span>
@@ -402,12 +402,12 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
                 key={r.id}
                 type="button"
                 onClick={() => onRouteChange(r.id)}
-                className={`flex-shrink-0 min-w-[130px] p-2.5 rounded-2xl text-left border-2 transition-all flex flex-col gap-1 select-none ${
+                className={`flex-shrink-0 min-w-[130px] p-2.5 rounded-2xl text-left border transition-all flex flex-col gap-1 select-none ${
                   isSelected
-                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/90 dark:bg-indigo-950/60 shadow-sm ring-2 ring-indigo-500/20'
+                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/90 dark:bg-indigo-950/60 shadow-xs ring-1 ring-indigo-500/20'
                     : isRouteCaught
-                    ? 'border-emerald-200 dark:border-emerald-800/70 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
-                    : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'border-emerald-200 dark:border-emerald-800/70 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
+                    : 'border-slate-200 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">

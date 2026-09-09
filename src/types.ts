@@ -47,3 +47,17 @@ export interface SavedEncounter {
   notes?: string;
   isShiny?: boolean;
 }
+
+export interface GameTenant {
+  id: string;
+  name: string;
+  shortName: string;
+  region: string;
+  generation: string;
+  badge: string;
+  badgeColor: string; // Tailwind color class e.g. 'bg-red-500'
+  description: string;
+  authorOrSource?: string;
+  isCustom?: boolean;
+  routes: RouteData[];
+}
