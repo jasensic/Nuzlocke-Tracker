@@ -1,0 +1,6 @@
+{
+  "name": "Nuzlocke Pokemon Blessed Shield",
+  "description": "Elige aleatoriamente tu Pokémon por ruta según las probabilidades oficiales del juego y guarda tus encuentros capturados o registrados.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
