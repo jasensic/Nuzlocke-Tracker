@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { RouteEncounter, SavedEncounter } from '../types';
 import { parsePokemonName, TYPE_COLORS, getPokemonSprite } from '../utils/pokemonMeta';
 import { translateWeather } from '../data/routeTranslations';
-import { Sparkles, BookmarkCheck, Check, ShieldAlert, Heart, Box, Wind, Compass, Hand } from 'lucide-react';
+import { usePokeDetail } from '../context/PokeDetailContext';
+import { Sparkles, BookmarkCheck, Check, ShieldAlert, Heart, Box, Wind, Compass, Hand, Info } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sfx } from '../utils/audio';
 
@@ -24,8 +25,9 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
   isAlreadySaved = false,
   selectionMode = 'random',
 }) => {
+  const { openDetail } = usePokeDetail();
   const { displayName, cleanName, formLabel, types } = parsePokemonName(encounter.pokemon);
-  const { sprite, showdown } = getPokemonSprite(encounter.pokemon);
+  const { sprite, showdown, shinySprite, shinyShowdown } = getPokemonSprite(encounter.pokemon);
 
   const [status, setStatus] = useState<SavedEncounter['status']>('Capturado');
   const [nickname, setNickname] = useState('');
@@ -33,6 +35,41 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
   const [isShiny, setIsShiny] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(isAlreadySaved);
   const [imgSrc, setImgSrc] = useState(showdown);
+
+  // Synchronize internal state whenever the encounter or route changes
+  useEffect(() => {
+    setImgSrc(showdown);
+    setSavedSuccess(isAlreadySaved);
+    setNickname('');
+    setNotes('');
+    setIsShiny(false);
+    setStatus('Capturado');
+  }, [encounter.pokemon, encounter.method, encounter.weather, encounter.levelRange, routeId, isAlreadySaved, showdown]);
+
+  // Update image when shiny mode is toggled
+  useEffect(() => {
+    if (isShiny) {
+      setImgSrc(shinyShowdown || showdown);
+    } else {
+      setImgSrc(showdown);
+    }
+  }, [isShiny, showdown, shinyShowdown]);
+
+  const handleImageError = () => {
+    if (isShiny) {
+      if (imgSrc === shinyShowdown) {
+        setImgSrc(shinySprite);
+      } else if (imgSrc === shinySprite) {
+        setImgSrc(showdown);
+      } else if (imgSrc === showdown) {
+        setImgSrc(sprite);
+      }
+    } else {
+      if (imgSrc !== sprite) {
+        setImgSrc(sprite);
+      }
+    }
+  };
 
   const primaryType = types[0] || 'Normal';
   const typeStyle = TYPE_COLORS[primaryType] || TYPE_COLORS['Normal'];
@@ -126,14 +163,11 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
                 }}
               />
               <img
+                key={`${encounter.pokemon}-${isShiny ? 'shiny' : 'normal'}-${imgSrc}`}
                 src={imgSrc}
                 alt={displayName}
                 className="w-28 h-28 object-contain z-10 transition-transform duration-300 group-hover:scale-110 drop-shadow-md"
-                onError={() => {
-                  if (imgSrc !== sprite) {
-                    setImgSrc(sprite);
-                  }
-                }}
+                onError={handleImageError}
               />
             </div>
 
@@ -174,9 +208,20 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
               )}
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {displayName}
-            </h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {displayName}
+              </h2>
+              <button
+                type="button"
+                onClick={() => openDetail('pokemon', cleanName)}
+                className="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors flex items-center gap-1 cursor-pointer"
+                title={`Ver estadísticas base, habilidades y datos de ${displayName}`}
+              >
+                <Info className="w-3.5 h-3.5" />
+                <span>Ver Datos PokéAPI</span>
+              </button>
+            </div>
 
             {/* Badges for Weather, Method & Levels */}
             <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
@@ -185,7 +230,21 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
                 <span className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
                   <span className="truncate">
-                    {encounter.method === 'Hidden'
+                    {encounter.methods && encounter.methods.length > 1
+                      ? encounter.methods
+                          .map((m) =>
+                            m === 'Hidden'
+                              ? 'Oculta'
+                              : m === 'Visible'
+                              ? 'Visible'
+                              : m === 'Fishing'
+                              ? 'Pesca'
+                              : m === 'Surfing'
+                              ? 'Surf'
+                              : m
+                          )
+                          .join(' / ')
+                      : encounter.method === 'Hidden'
                       ? 'Hierba Oculta (!)'
                       : encounter.method === 'Visible'
                       ? 'Sobrehierba Visible'

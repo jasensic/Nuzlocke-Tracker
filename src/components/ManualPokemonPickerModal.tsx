@@ -282,12 +282,20 @@ export const ManualPokemonPickerModal: React.FC<ManualPokemonPickerModalProps> =
                         </div>
 
                         {/* Method & Level */}
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
-                          <span className="truncate">{translateMethod(enc.method)}</span>
-                          <span>•</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">
-                            Nv. {enc.levelRange}
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 flex-wrap">
+                          <span className="truncate">
+                            {enc.methods && enc.methods.length > 1
+                              ? enc.methods.map(translateMethod).join(' / ')
+                              : translateMethod(enc.method)}
                           </span>
+                          {enc.levelRange && (
+                            <>
+                              <span>•</span>
+                              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                {enc.levelRange.startsWith('Nv.') ? enc.levelRange : `Nv. ${enc.levelRange}`}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

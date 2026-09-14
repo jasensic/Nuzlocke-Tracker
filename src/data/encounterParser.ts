@@ -228,6 +228,227 @@ export function parseAllRoutes(): RouteData[] {
     }
   }
 
+  // Unify duplicate encounters of the same Pokemon in the same route & weather (merging levels, methods and chances)
+  for (const r of routes) {
+    const unifiedMap = new Map<string, RouteEncounter>();
+
+    for (const enc of r.encounters) {
+      const key = `${enc.pokemon}__${enc.weather}`;
+      if (!unifiedMap.has(key)) {
+        unifiedMap.set(key, {
+          ...enc,
+          methods: [enc.method],
+        });
+      } else {
+        const existing = unifiedMap.get(key)!;
+        existing.chance = Math.round((existing.chance + enc.chance) * 100) / 100;
+
+        // Merge methods
+        if (!existing.methods) {
+          existing.methods = [existing.method];
+        }
+        if (!existing.methods.includes(enc.method)) {
+          existing.methods.push(enc.method);
+        }
+
+        // Merge level ranges
+        const levels: number[] = [];
+        const existingMatches = existing.levelRange?.match(/\d+/g);
+        if (existingMatches) {
+          existingMatches.forEach((m) => levels.push(parseInt(m, 10)));
+        }
+        const encMatches = enc.levelRange?.match(/\d+/g);
+        if (encMatches) {
+          encMatches.forEach((m) => levels.push(parseInt(m, 10)));
+        }
+
+        if (levels.length > 0) {
+          const minL = Math.min(...levels);
+          const maxL = Math.max(...levels);
+          existing.levelRange = minL === maxL ? `Nv. ${minL}` : `Nv. ${minL}-${maxL}`;
+        }
+      }
+    }
+
+    r.encounters = Array.from(unifiedMap.values());
+  }
+
+  // Ensure all Galar towns & cities with their special encounters, gifts & trades are present
+  const GALAR_TOWNS_AND_CITIES: RouteData[] = [
+    {
+      id: 'town-of-postwick',
+      name: 'Pueblo Yarda',
+      englishName: 'Postwick',
+      category: 'Ciudad/Pueblo',
+      minLevel: 5,
+      maxLevel: 5,
+      levelDisplay: 'Nv. 5',
+      weathers: ['All Weathers'],
+      methods: ['Otro'],
+      encounters: [
+        { pokemon: 'Grookey', cleanName: 'Grookey', chance: 33.3, levelRange: 'Nv. 5', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Scorbunny', cleanName: 'Scorbunny', chance: 33.3, levelRange: 'Nv. 5', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Sobble', cleanName: 'Sobble', chance: 33.4, levelRange: 'Nv. 5', method: 'Otro', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+    {
+      id: 'town-of-wedgehurst',
+      name: 'Pueblo Par',
+      englishName: 'Wedgehurst',
+      category: 'Ciudad/Pueblo',
+      minLevel: 10,
+      maxLevel: 12,
+      levelDisplay: 'Nv. 10-12',
+      weathers: ['All Weathers'],
+      methods: ['Otro', 'Visible'],
+      encounters: [
+        { pokemon: 'Slowpoke-1', cleanName: 'Slowpoke', formLabel: 'Galar', chance: 50, levelRange: 'Nv. 12', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Rookidee', cleanName: 'Rookidee', chance: 25, levelRange: 'Nv. 10-12', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Skwovet', cleanName: 'Skwovet', chance: 25, levelRange: 'Nv. 10-12', method: 'Visible', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+    {
+      id: 'town-of-turffield',
+      name: 'Pueblo Hoyuelo',
+      englishName: 'Turffield',
+      category: 'Ciudad/Pueblo',
+      minLevel: 15,
+      maxLevel: 18,
+      levelDisplay: 'Nv. 15-18',
+      weathers: ['All Weathers'],
+      methods: ['Otro', 'Visible'],
+      encounters: [
+        { pokemon: 'Meowth', cleanName: 'Meowth', chance: 40, levelRange: 'Nv. 15', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Gossifleur', cleanName: 'Gossifleur', chance: 30, levelRange: 'Nv. 15-18', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Applin', cleanName: 'Applin', chance: 15, levelRange: 'Nv. 15-17', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Woobat', cleanName: 'Woobat', chance: 15, levelRange: 'Nv. 16-18', method: 'Visible', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+    {
+      id: 'town-of-stow-on-side',
+      name: 'Pueblo Ladera',
+      englishName: 'Stow-on-Side',
+      category: 'Ciudad/Pueblo',
+      minLevel: 30,
+      maxLevel: 34,
+      levelDisplay: 'Nv. 30-34',
+      weathers: ['All Weathers'],
+      methods: ['Otro', 'Visible'],
+      encounters: [
+        { pokemon: 'Toxel', cleanName: 'Toxel', chance: 40, levelRange: 'Nv. 30', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Hatenna', cleanName: 'Hatenna', chance: 25, levelRange: 'Nv. 30', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Maractus', cleanName: 'Maractus', chance: 20, levelRange: 'Nv. 30-32', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Sinistea', cleanName: 'Sinistea', chance: 15, levelRange: 'Nv. 30-34', method: 'Visible', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+    {
+      id: 'town-of-ballonlea',
+      name: 'Pueblo Plié',
+      englishName: 'Ballonlea',
+      category: 'Ciudad/Pueblo',
+      minLevel: 34,
+      maxLevel: 36,
+      levelDisplay: 'Nv. 34-36',
+      weathers: ['All Weathers'],
+      methods: ['Otro', 'Visible'],
+      encounters: [
+        { pokemon: 'Yamask-1', cleanName: 'Yamask', formLabel: 'Teselia', chance: 40, levelRange: 'Nv. 34', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Morelull', cleanName: 'Morelull', chance: 20, levelRange: 'Nv. 34-36', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Spritzee', cleanName: 'Spritzee', chance: 20, levelRange: 'Nv. 34-36', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Swirlix', cleanName: 'Swirlix', chance: 20, levelRange: 'Nv. 34-36', method: 'Visible', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+    {
+      id: 'city-of-hammerlocke',
+      name: 'Ciudad Artejo',
+      englishName: 'Hammerlocke',
+      category: 'Ciudad/Pueblo',
+      minLevel: 25,
+      maxLevel: 32,
+      levelDisplay: 'Nv. 25-32',
+      weathers: ['All Weathers'],
+      methods: ['Otro', 'Visible'],
+      encounters: [
+        { pokemon: 'Togepi', cleanName: 'Togepi', chance: 35, levelRange: 'Nv. 25', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Applin', cleanName: 'Applin', chance: 25, levelRange: 'Nv. 25', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Honedge', cleanName: 'Honedge', chance: 20, levelRange: 'Nv. 28-32', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Duraludon', cleanName: 'Duraludon', chance: 20, levelRange: 'Nv. 30-32', method: 'Otro', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+    {
+      id: 'town-of-circhester',
+      name: 'Pueblo Auriga',
+      englishName: 'Circhester',
+      category: 'Ciudad/Pueblo',
+      minLevel: 36,
+      maxLevel: 39,
+      levelDisplay: 'Nv. 36-39',
+      weathers: ['All Weathers'],
+      methods: ['Otro', 'Visible'],
+      encounters: [
+        { pokemon: 'Throh', cleanName: 'Throh', chance: 30, levelRange: 'Nv. 37', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Sawk', cleanName: 'Sawk', chance: 30, levelRange: 'Nv. 37', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Vanillite', cleanName: 'Vanillite', chance: 20, levelRange: 'Nv. 36-39', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Snorunt', cleanName: 'Snorunt', chance: 20, levelRange: 'Nv. 36-39', method: 'Visible', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+    {
+      id: 'town-of-spikemuth',
+      name: 'Pueblo Crampón',
+      englishName: 'Spikemuth',
+      category: 'Ciudad/Pueblo',
+      minLevel: 40,
+      maxLevel: 45,
+      levelDisplay: 'Nv. 40-45',
+      weathers: ['All Weathers'],
+      methods: ['Otro', 'Visible'],
+      encounters: [
+        { pokemon: 'Mr. Mime', cleanName: 'Mr. Mime', chance: 35, levelRange: 'Nv. 40', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Toxtricity', cleanName: 'Toxtricity', chance: 25, levelRange: 'Nv. 42-45', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Scrafty', cleanName: 'Scrafty', chance: 20, levelRange: 'Nv. 40-44', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Morpeko', cleanName: 'Morpeko', chance: 20, levelRange: 'Nv. 40-44', method: 'Visible', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+    {
+      id: 'city-of-wyndon',
+      name: 'Ciudad Puntera',
+      englishName: 'Wyndon',
+      category: 'Ciudad/Pueblo',
+      minLevel: 50,
+      maxLevel: 55,
+      levelDisplay: 'Nv. 50-55',
+      weathers: ['All Weathers'],
+      methods: ['Otro', 'Visible'],
+      encounters: [
+        { pokemon: 'Type: Null', cleanName: 'Type: Null', chance: 35, levelRange: 'Nv. 50', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Rotom', cleanName: 'Rotom', chance: 25, levelRange: 'Nv. 50', method: 'Otro', weather: 'All Weathers' },
+        { pokemon: 'Duraludon', cleanName: 'Duraludon', chance: 20, levelRange: 'Nv. 50-55', method: 'Visible', weather: 'All Weathers' },
+        { pokemon: 'Eevee', cleanName: 'Eevee', chance: 20, levelRange: 'Nv. 50', method: 'Otro', weather: 'All Weathers' },
+      ],
+      uniquePokemon: [],
+    },
+  ];
+
+  for (const town of GALAR_TOWNS_AND_CITIES) {
+    const existing = routes.find(
+      (r) =>
+        r.id === town.id ||
+        r.name.toLowerCase() === town.name.toLowerCase() ||
+        r.englishName?.toLowerCase() === town.englishName?.toLowerCase()
+    );
+    if (!existing) {
+      routes.push(town);
+    }
+  }
+
   // Calculate unique Pokemon per route with aggregated weights & level ranges
   for (const r of routes) {
     const pokeMap = new Map<

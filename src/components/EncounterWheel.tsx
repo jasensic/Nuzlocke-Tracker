@@ -18,6 +18,7 @@ export const EncounterWheel: React.FC<EncounterWheelProps> = ({ isSpinning, acti
   return (
     <motion.div
       id="encounter-wheel-preview"
+      key={activeCandidate}
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/90 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-md w-full max-w-sm transition-colors"
@@ -26,6 +27,7 @@ export const EncounterWheel: React.FC<EncounterWheelProps> = ({ isSpinning, acti
         {isSpinning ? (
           <div className="w-20 h-20 rounded-full bg-slate-200/80 dark:bg-slate-700/80 animate-pulse flex items-center justify-center">
             <img
+              key={`spin-${activeCandidate}`}
               src={sprite}
               alt={displayName}
               className="w-20 h-20 object-contain filter blur-[1px] brightness-75 scale-110"
@@ -37,6 +39,7 @@ export const EncounterWheel: React.FC<EncounterWheelProps> = ({ isSpinning, acti
           </div>
         ) : (
           <img
+            key={`idle-${activeCandidate}`}
             src={sprite}
             alt={displayName}
             className="w-24 h-24 object-contain drop-shadow-md animate-bounce"

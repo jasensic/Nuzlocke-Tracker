@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { SavedEncounter, GameTenant } from '../types';
+import { SavedEncounter, GameTenant, StarterChoice } from '../types';
 import { parsePokemonName, TYPE_COLORS, getPokemonSprite } from '../utils/pokemonMeta';
 import { translateRouteName } from '../data/routeTranslations';
+import { STARTERS_INFO } from '../data/trainers/trainerTranslations';
+import { usePokeDetail } from '../context/PokeDetailContext';
 import {
   Trash2,
   Download,
@@ -16,15 +18,26 @@ import {
   Check,
   X,
   Gamepad2,
+  Award,
+  Leaf,
+  Flame,
+  Droplets,
+  Plus,
+  CheckCircle2,
 } from 'lucide-react';
+
+const STARTER_STORAGE_KEY = 'pokemon_starter_choice_v1';
 
 interface SavedHistoryViewProps {
   history: SavedEncounter[];
   onUpdate: (id: string, updates: Partial<SavedEncounter>) => void;
   onDelete: (id: string) => void;
   onClearAll: () => void;
+  onSaveEncounter?: (encounter: SavedEncounter) => void;
   activeTenant?: GameTenant;
   onOpenTenantModal?: () => void;
+  starterChoice?: StarterChoice;
+  onSelectStarter?: (starter: StarterChoice) => void;
 }
 
 export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
@@ -32,9 +45,13 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
   onUpdate,
   onDelete,
   onClearAll,
+  onSaveEncounter,
   activeTenant,
   onOpenTenantModal,
+  starterChoice: propStarterChoice,
+  onSelectStarter: propOnSelectStarter,
 }) => {
+  const { openDetail } = usePokeDetail();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [routeFilter, setRouteFilter] = useState<string>('All');
@@ -44,6 +61,69 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
   const [editNotes, setEditNotes] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
+
+  // Local starter choice fallback if not passed via props
+  const [localStarter, setLocalStarter] = useState<StarterChoice>(() => {
+    try {
+      const saved = localStorage.getItem(STARTER_STORAGE_KEY) as StarterChoice;
+      if (saved === 'grookey' || saved === 'scorbunny' || saved === 'sobble') return saved;
+    } catch {}
+    return 'grookey';
+  });
+
+  const activeStarterChoice = propStarterChoice || localStarter;
+  const starterMeta = STARTERS_INFO[activeStarterChoice] || STARTERS_INFO.grookey;
+
+  // Check if starter encounter is present in history
+  const starterInHistory = history.find(
+    (h) =>
+      h.id === 'starter-choice-encounter' ||
+      h.routeId === 'town-of-postwick' ||
+      h.routeName === 'Pueblo Yarda' ||
+      h.cleanName.toLowerCase() === starterMeta.species.toLowerCase()
+  );
+
+  const handleStarterSwitch = (st: StarterChoice) => {
+    if (propOnSelectStarter) {
+      propOnSelectStarter(st);
+    } else {
+      setLocalStarter(st);
+    }
+    try {
+      localStorage.setItem(STARTER_STORAGE_KEY, st);
+    } catch {}
+
+    // If starter is already registered in history, update its data seamlessly
+    if (starterInHistory) {
+      const newMeta = STARTERS_INFO[st];
+      onUpdate(starterInHistory.id, {
+        pokemon: newMeta.name,
+        cleanName: newMeta.species,
+        notes: `Pokémon inicial escogido (${newMeta.name}, tipo ${newMeta.type}) entregado por Lionel en Pueblo Yarda.`,
+      });
+    }
+  };
+
+  const handleRegisterStarterToHistory = () => {
+    if (starterInHistory) return;
+    const newEncounter: SavedEncounter = {
+      id: 'starter-choice-encounter',
+      timestamp: Date.now(),
+      routeId: 'town-of-postwick',
+      routeName: 'Pueblo Yarda',
+      pokemon: starterMeta.name,
+      cleanName: starterMeta.species,
+      method: 'Otro',
+      weather: 'Todos los Climas',
+      levelRange: 'Nv. 5',
+      chance: 100,
+      status: 'En Equipo',
+      notes: `Pokémon inicial escogido (${starterMeta.name}, tipo ${starterMeta.type}) entregado por Lionel en Pueblo Yarda.`,
+    };
+    if (onSaveEncounter) {
+      onSaveEncounter(newEncounter);
+    }
+  };
 
   // Extract unique routes from history
   const uniqueRoutes = Array.from(new Set(history.map((h) => translateRouteName(h.routeName)))).sort();
@@ -241,6 +321,157 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
         </div>
       </div>
 
+      {/* CHOSEN STARTER HIGHLIGHT CARD */}
+      {(!activeTenant || activeTenant.id === 'blessed-shield') && (
+        <div
+          id="chosen-starter-card"
+          className="bg-gradient-to-r from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 rounded-3xl p-5 sm:p-6 border-2 border-amber-400/60 dark:border-amber-500/40 shadow-sm relative overflow-hidden transition-colors"
+        >
+          {/* Ambient decor */}
+          <div className="absolute top-0 right-0 w-72 h-72 bg-amber-400/10 dark:bg-amber-400/5 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 space-y-4">
+            {/* Header: Label & Starter Switcher */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-700/80">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 shadow-2xs">
+                  <Award className="w-4 h-4" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight">
+                      Pokémon Inicial de la Aventura
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white rounded-full shadow-2xs">
+                      ★ Inicial
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Pueblo Yarda (Postwick) • Entregado por el Campeón Lionel • Nivel inicial: Nv. 5
+                  </p>
+                </div>
+              </div>
+
+              {/* Starter Switcher Pills */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl self-start sm:self-auto border border-slate-200/60 dark:border-slate-700/60">
+                {(['grookey', 'scorbunny', 'sobble'] as StarterChoice[]).map((st) => {
+                  const isSelected = activeStarterChoice === st;
+                  const meta = STARTERS_INFO[st];
+                  const activeBg =
+                    st === 'grookey'
+                      ? 'bg-emerald-600 text-white shadow-emerald-600/30'
+                      : st === 'scorbunny'
+                      ? 'bg-orange-600 text-white shadow-orange-600/30'
+                      : 'bg-blue-600 text-white shadow-blue-600/30';
+
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => handleStarterSwitch(st)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? `${activeBg} shadow-sm`
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                      title={`Elegir a ${meta.name} como inicial`}
+                    >
+                      {st === 'grookey' && <Leaf className="w-3.5 h-3.5" />}
+                      {st === 'scorbunny' && <Flame className="w-3.5 h-3.5" />}
+                      {st === 'sobble' && <Droplets className="w-3.5 h-3.5" />}
+                      <span>{meta.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Main Starter Details & Registration */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              {/* Left: Animated Showdown Sprite & Description */}
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => openDetail('pokemon', starterMeta.species)}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xs flex items-center justify-center p-2 relative flex-shrink-0 cursor-pointer hover:border-amber-400 hover:scale-105 transition-all group"
+                  title={`Ver estadísticas de ${starterMeta.name}`}
+                >
+                  <img
+                    src={starterMeta.showdown}
+                    alt={starterMeta.name}
+                    className="w-14 h-14 sm:w-16 sm:h-16 object-contain group-hover:scale-110 transition-transform"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = starterMeta.sprite;
+                    }}
+                  />
+                </button>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => openDetail('pokemon', starterMeta.species)}
+                      className="text-lg sm:text-xl font-black text-slate-900 dark:text-white hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer text-left transition-colors"
+                      title={`Ver estadísticas de ${starterMeta.name}`}
+                    >
+                      {starterInHistory?.nickname
+                        ? `${starterInHistory.nickname} (${starterMeta.name})`
+                        : starterMeta.name}
+                    </button>
+                    <span className={`px-2.5 py-0.5 text-[11px] font-extrabold rounded-full ${starterMeta.typeColor}`}>
+                      {starterMeta.type}
+                    </span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                      Nv. 5
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 max-w-lg">
+                    {starterMeta.description} • Tu rival Paúl combatirá con {starterMeta.hopStarterName} ({starterMeta.hopStarterType}).
+                  </p>
+                </div>
+              </div>
+
+              {/* Right: Registration status & edit actions */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+                {starterInHistory ? (
+                  <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-3.5 py-2 rounded-2xl text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    <div>
+                      <span className="font-bold text-emerald-800 dark:text-emerald-300 block">
+                        Registrado en la Bitácora
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                        Estado: {starterInHistory.status} • Pueblo Yarda
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRegisterStarterToHistory}
+                    className="px-4 py-2.5 rounded-2xl text-xs font-black bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Añadir Inicial a la Bitácora</span>
+                  </button>
+                )}
+
+                {starterInHistory && (
+                  <button
+                    type="button"
+                    onClick={() => handleStartEdit(starterInHistory)}
+                    className="px-3.5 py-2 rounded-2xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Editar Mote / Estado</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filter Controls */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-3 transition-colors">
         <div className="relative flex-1">
@@ -326,11 +557,16 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
 
                 {/* Content */}
                 <div className="py-3 flex items-start gap-3">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 relative flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openDetail('pokemon', item.cleanName)}
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 flex items-center justify-center p-1 relative flex-shrink-0 cursor-pointer transition-all hover:scale-105 group"
+                    title={`Ver detalles de ${displayName}`}
+                  >
                     <img
                       src={sprite}
                       alt={displayName}
-                      className="w-12 h-12 sm:w-14 sm:h-14 object-contain"
+                      className="w-12 h-12 sm:w-14 sm:h-14 object-contain group-hover:scale-110 transition-transform"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.opacity = '0.3';
                       }}
@@ -340,13 +576,26 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
                         <Sparkles className="w-3 h-3 fill-amber-950" />
                       </span>
                     )}
-                  </div>
+                  </button>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
+                      <button
+                        type="button"
+                        onClick={() => openDetail('pokemon', item.cleanName)}
+                        className="text-sm sm:text-base font-black text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 truncate cursor-pointer text-left transition-colors"
+                        title={`Ver detalles de ${displayName}`}
+                      >
                         {item.nickname ? `${item.nickname} (${displayName})` : displayName}
-                      </h4>
+                      </button>
+                      {(item.id === 'starter-choice-encounter' ||
+                        item.routeId === 'town-of-postwick' ||
+                        item.routeName === 'Pueblo Yarda' ||
+                        item.cleanName.toLowerCase() === starterMeta.species.toLowerCase()) && (
+                        <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-full shadow-2xs">
+                          ★ Inicial
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">

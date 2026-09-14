@@ -1,6 +1,6 @@
 {
   "name": "Nuzlocke Pokemon Blessed Shield",
-  "description": "Elige aleatoriamente tu Pokémon por ruta con soporte multijuego y mods (Blessed Shield, Radical Red, Renegade Platinum, Esmeralda y bases de datos personalizadas).",
+  "description": "Elige aleatoriamente tu Pokémon por ruta con soporte multijuego y mods, y consulta la guía completa de combates contra rivales (Blessed Shield) con movimientos, habilidades y objetos.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

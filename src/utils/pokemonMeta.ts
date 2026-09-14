@@ -366,7 +366,7 @@ const TYPE_MAP: Record<string, string[]> = {
 };
 
 export const TYPE_COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
-  Normal: { bg: 'bg-stone-500', text: 'text-stone-100', border: 'border-stone-400', badge: 'bg-stone-600/80 text-white' },
+  Normal: { bg: 'bg-zinc-500', text: 'text-zinc-100', border: 'border-zinc-400', badge: 'bg-zinc-500 text-white' },
   Fire: { bg: 'bg-orange-500', text: 'text-orange-100', border: 'border-orange-400', badge: 'bg-orange-600 text-white' },
   Water: { bg: 'bg-blue-500', text: 'text-blue-100', border: 'border-blue-400', badge: 'bg-blue-600 text-white' },
   Grass: { bg: 'bg-emerald-500', text: 'text-emerald-100', border: 'border-emerald-400', badge: 'bg-emerald-600 text-white' },
@@ -378,13 +378,59 @@ export const TYPE_COLORS: Record<string, { bg: string; text: string; border: str
   Flying: { bg: 'bg-indigo-400', text: 'text-indigo-950', border: 'border-indigo-300', badge: 'bg-indigo-500 text-white' },
   Psychic: { bg: 'bg-pink-500', text: 'text-pink-100', border: 'border-pink-400', badge: 'bg-pink-600 text-white' },
   Bug: { bg: 'bg-lime-600', text: 'text-lime-100', border: 'border-lime-500', badge: 'bg-lime-600 text-white' },
-  Rock: { bg: 'bg-stone-600', text: 'text-stone-100', border: 'border-stone-500', badge: 'bg-stone-700 text-white' },
+  Rock: { bg: 'bg-yellow-700', text: 'text-yellow-100', border: 'border-yellow-600', badge: 'bg-yellow-700 text-white' },
   Ghost: { bg: 'bg-violet-800', text: 'text-violet-100', border: 'border-violet-700', badge: 'bg-violet-800 text-white' },
   Dragon: { bg: 'bg-indigo-700', text: 'text-indigo-100', border: 'border-indigo-600', badge: 'bg-indigo-700 text-white' },
   Dark: { bg: 'bg-neutral-800', text: 'text-neutral-100', border: 'border-neutral-700', badge: 'bg-neutral-800 text-white' },
   Steel: { bg: 'bg-slate-500', text: 'text-slate-100', border: 'border-slate-400', badge: 'bg-slate-600 text-white' },
   Fairy: { bg: 'bg-rose-400', text: 'text-rose-950', border: 'border-rose-300', badge: 'bg-rose-500 text-white' },
+
+  // Spanish aliases
+  Roca: { bg: 'bg-yellow-700', text: 'text-yellow-100', border: 'border-yellow-600', badge: 'bg-yellow-700 text-white' },
+  Fuego: { bg: 'bg-orange-500', text: 'text-orange-100', border: 'border-orange-400', badge: 'bg-orange-600 text-white' },
+  Agua: { bg: 'bg-blue-500', text: 'text-blue-100', border: 'border-blue-400', badge: 'bg-blue-600 text-white' },
+  Planta: { bg: 'bg-emerald-500', text: 'text-emerald-100', border: 'border-emerald-400', badge: 'bg-emerald-600 text-white' },
+  Eléctrico: { bg: 'bg-amber-400', text: 'text-amber-950', border: 'border-amber-300', badge: 'bg-amber-400 text-amber-950' },
+  Hielo: { bg: 'bg-cyan-400', text: 'text-cyan-950', border: 'border-cyan-300', badge: 'bg-cyan-500 text-white' },
+  Lucha: { bg: 'bg-red-700', text: 'text-red-100', border: 'border-red-600', badge: 'bg-red-700 text-white' },
+  Veneno: { bg: 'bg-purple-600', text: 'text-purple-100', border: 'border-purple-500', badge: 'bg-purple-700 text-white' },
+  Tierra: { bg: 'bg-amber-700', text: 'text-amber-100', border: 'border-amber-600', badge: 'bg-amber-700 text-white' },
+  Volador: { bg: 'bg-indigo-400', text: 'text-indigo-950', border: 'border-indigo-300', badge: 'bg-indigo-500 text-white' },
+  Psíquico: { bg: 'bg-pink-500', text: 'text-pink-100', border: 'border-pink-400', badge: 'bg-pink-600 text-white' },
+  Bicho: { bg: 'bg-lime-600', text: 'text-lime-100', border: 'border-lime-500', badge: 'bg-lime-600 text-white' },
+  Fantasma: { bg: 'bg-violet-800', text: 'text-violet-100', border: 'border-violet-700', badge: 'bg-violet-800 text-white' },
+  Dragón: { bg: 'bg-indigo-700', text: 'text-indigo-100', border: 'border-indigo-600', badge: 'bg-indigo-700 text-white' },
+  Siniestro: { bg: 'bg-neutral-800', text: 'text-neutral-100', border: 'border-neutral-700', badge: 'bg-neutral-800 text-white' },
+  Acero: { bg: 'bg-slate-500', text: 'text-slate-100', border: 'border-slate-400', badge: 'bg-slate-600 text-white' },
+  Hada: { bg: 'bg-rose-400', text: 'text-rose-950', border: 'border-rose-300', badge: 'bg-rose-500 text-white' },
 };
+
+export const TYPE_TRANSLATIONS_ES: Record<string, string> = {
+  normal: 'Normal',
+  fire: 'Fuego',
+  water: 'Agua',
+  grass: 'Planta',
+  electric: 'Eléctrico',
+  ice: 'Hielo',
+  fighting: 'Lucha',
+  poison: 'Veneno',
+  ground: 'Tierra',
+  flying: 'Volador',
+  psychic: 'Psíquico',
+  bug: 'Bicho',
+  rock: 'Roca',
+  ghost: 'Fantasma',
+  dragon: 'Dragón',
+  steel: 'Acero',
+  dark: 'Siniestro',
+  fairy: 'Hada',
+};
+
+export function translateType(type: string): string {
+  if (!type) return 'Normal';
+  const clean = type.toLowerCase().trim();
+  return TYPE_TRANSLATIONS_ES[clean] || type;
+}
 
 // Identify regional forms or variants
 export function parsePokemonName(rawName: string): {
@@ -444,6 +490,22 @@ export function parsePokemonName(rawName: string): {
     cleanName = 'Ponyta';
     formLabel = 'Galar';
     apiName = 'ponyta-galar';
+  } else if (trimmed === 'Rapidash-1' || trimmed === 'G-Rapidash') {
+    cleanName = 'Rapidash';
+    formLabel = 'Galar';
+    apiName = 'rapidash-galar';
+  } else if (trimmed === 'Lycanroc Day') {
+    cleanName = 'Lycanroc';
+    formLabel = 'Forma Diurna';
+    apiName = 'lycanroc';
+  } else if (trimmed === 'Lycanroc Dusk') {
+    cleanName = 'Lycanroc';
+    formLabel = 'Forma Crepuscular';
+    apiName = 'lycanroc-dusk';
+  } else if (trimmed === 'Lycanroc Night') {
+    cleanName = 'Lycanroc';
+    formLabel = 'Forma Nocturna';
+    apiName = 'lycanroc-midnight';
   } else if (trimmed === 'Weezing-1') {
     cleanName = 'Weezing';
     formLabel = 'Galar';
@@ -511,6 +573,7 @@ export function parsePokemonName(rawName: string): {
     if (cleanName === 'Corsola') types = ['Ghost'];
     if (cleanName === 'Slowpoke') types = ['Psychic'];
     if (cleanName === 'Ponyta') types = ['Psychic'];
+    if (cleanName === 'Rapidash') types = ['Psychic', 'Fairy'];
     if (cleanName === 'Weezing') types = ['Poison', 'Fairy'];
     if (cleanName === 'Yamask') types = ['Ground', 'Ghost'];
     if (cleanName === 'Stunfisk') types = ['Ground', 'Steel'];
@@ -525,17 +588,23 @@ export function parsePokemonName(rawName: string): {
   }
 
   const displayName = formLabel ? `${cleanName} (${formLabel})` : cleanName;
+  const spanishTypes = types.map(translateType);
 
   return {
     displayName,
     cleanName,
     formLabel,
     apiName,
-    types,
+    types: spanishTypes,
   };
 }
 
-export function getPokemonSprite(pokemonName: string): { sprite: string; showdown: string } {
+export function getPokemonSprite(pokemonName: string): {
+  sprite: string;
+  showdown: string;
+  shinySprite: string;
+  shinyShowdown: string;
+} {
   const { apiName } = parsePokemonName(pokemonName);
   
   // Format for PokeAPI / Pokemon Showdown sprite repository
@@ -547,6 +616,8 @@ export function getPokemonSprite(pokemonName: string): { sprite: string; showdow
 
   const sprite = `https://play.pokemonshowdown.com/sprites/gen5/${cleanKey}.png`;
   const showdown = `https://play.pokemonshowdown.com/sprites/ani/${cleanKey}.gif`;
+  const shinySprite = `https://play.pokemonshowdown.com/sprites/gen5-shiny/${cleanKey}.png`;
+  const shinyShowdown = `https://play.pokemonshowdown.com/sprites/ani-shiny/${cleanKey}.gif`;
   
-  return { sprite, showdown };
+  return { sprite, showdown, shinySprite, shinyShowdown };
 }

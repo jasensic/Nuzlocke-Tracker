@@ -39,7 +39,10 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
       enc.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
       enc.cleanName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesWeather = selectedWeather === 'All' || enc.weather === selectedWeather;
-    const matchesMethod = selectedMethod === 'All' || enc.method === selectedMethod;
+    const matchesMethod =
+      selectedMethod === 'All' ||
+      enc.method === selectedMethod ||
+      (enc.methods && enc.methods.includes(selectedMethod as any));
     return matchesSearch && matchesWeather && matchesMethod;
   });
 
@@ -194,9 +197,14 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
                     <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${typeStyle.badge}`}>
                       {primaryType}
                     </span>
-                    <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700/80 border border-slate-200/80 dark:border-slate-600 px-1.5 py-0.5 rounded-md">
-                      {translateMethod(enc.method)}
-                    </span>
+                    {(enc.methods && enc.methods.length > 0 ? enc.methods : [enc.method]).map((m) => (
+                      <span
+                        key={m}
+                        className="text-[10px] font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700/80 border border-slate-200/80 dark:border-slate-600 px-1.5 py-0.5 rounded-md"
+                      >
+                        {translateMethod(m)}
+                      </span>
+                    ))}
                     {enc.levelRange && (
                       <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
                         {enc.levelRange}

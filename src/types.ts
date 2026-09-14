@@ -7,6 +7,7 @@ export interface RouteEncounter {
   chance: number; // e.g., 10 for 10%
   levelRange?: string;
   method: EncounterMethod;
+  methods?: EncounterMethod[];
   weather: string;
 }
 
@@ -60,4 +61,36 @@ export interface GameTenant {
   authorOrSource?: string;
   isCustom?: boolean;
   routes: RouteData[];
+}
+
+export type StarterChoice = 'grookey' | 'scorbunny' | 'sobble';
+
+export interface TrainerPokemon {
+  name: string;
+  level: number;
+  item?: string;
+  ability: string;
+  nature: string;
+  evs?: string;
+  moves: string[];
+}
+
+export type TrainerCategory = 'all' | 'rival' | 'gym_leader' | 'champions_cup' | 'boss';
+
+export interface TrainerBattle {
+  id: string;
+  order: number;
+  category?: 'rival' | 'gym_leader' | 'champions_cup' | 'boss';
+  trainerName: string;
+  trainerTitle: string;
+  trainerId: string;
+  location: string;
+  locationEnglish: string;
+  isDoubleBattle?: boolean;
+  minLevel: number;
+  maxLevel: number;
+  avatarUrl?: string;
+  quote?: string;
+  starterVariants?: Record<StarterChoice, TrainerPokemon[]>;
+  fixedTeam?: TrainerPokemon[];
 }

@@ -7,7 +7,7 @@ import {
   getHistoryStorageKey,
   ACTIVE_TENANT_KEY,
 } from './data/tenantRegistry';
-import { RouteData, RouteEncounter, SavedEncounter, EncounterMethod, GameTenant } from './types';
+import { RouteData, RouteEncounter, SavedEncounter, EncounterMethod, GameTenant, StarterChoice } from './types';
 import { PokeballSpinner } from './components/PokeballSpinner';
 import { EncounterWheel } from './components/EncounterWheel';
 import { EncounterResultCard } from './components/EncounterResultCard';
@@ -15,6 +15,7 @@ import { QuickRouteBar } from './components/QuickRouteBar';
 import { RouteFilters } from './components/RouteFilters';
 import { SavedHistoryView } from './components/SavedHistoryView';
 import { RouteDatabaseView } from './components/RouteDatabaseView';
+import { StoryModeView } from './components/StoryModeView';
 import { GameTenantModal } from './components/GameTenantModal';
 import { GameTenantSelector } from './components/GameTenantSelector';
 import { ManualPokemonPickerModal } from './components/ManualPokemonPickerModal';
@@ -38,6 +39,7 @@ import {
 import confetti from 'canvas-confetti';
 
 const THEME_KEY = 'pokemon_tracker_theme_v1';
+const STARTER_STORAGE_KEY = 'pokemon_starter_choice_v1';
 
 export default function App() {
   // Multi-Tenancy State (Bases de datos de juegos y mods)
@@ -66,8 +68,8 @@ export default function App() {
   const [isManualPickerOpen, setIsManualPickerOpen] = useState<boolean>(false);
   const [selectionMode, setSelectionMode] = useState<'random' | 'manual'>('random');
 
-  // Active navigation tab
-  const [activeTab, setActiveTab] = useState<'roulette' | 'history' | 'database'>('roulette');
+  // Active navigation tab (Modo Historia is the primary adventure view)
+  const [activeTab, setActiveTab] = useState<'story' | 'roulette' | 'history' | 'database'>('story');
 
   // Dark mode state
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -128,6 +130,24 @@ export default function App() {
       return [];
     }
   });
+
+  // Starter choice state synchronized across Story Mode and Bitácora
+  const [starterChoice, setStarterChoice] = useState<StarterChoice>(() => {
+    try {
+      const saved = localStorage.getItem(STARTER_STORAGE_KEY) as StarterChoice;
+      if (saved === 'grookey' || saved === 'scorbunny' || saved === 'sobble') {
+        return saved;
+      }
+    } catch {}
+    return 'grookey';
+  });
+
+  const handleSelectStarter = (st: StarterChoice) => {
+    setStarterChoice(st);
+    try {
+      localStorage.setItem(STARTER_STORAGE_KEY, st);
+    } catch {}
+  };
 
   // When active tenant changes, reload that tenant's history
   useEffect(() => {
@@ -191,18 +211,15 @@ export default function App() {
     return allRoutes.find((r) => r.id === selectedRouteId) || allRoutes[0];
   }, [allRoutes, selectedRouteId]);
 
-  // Reset weather & method if route changes and previous selection is not present
-  useEffect(() => {
-    setSelectedWeather('All');
-    setSelectedMethod('All');
-  }, [selectedRouteId]);
-
   // Available encounters given current filters
   const availableEncounters = useMemo(() => {
     if (!currentRoute) return [];
     return currentRoute.encounters.filter((enc) => {
       const matchesWeather = selectedWeather === 'All' || enc.weather === selectedWeather;
-      const matchesMethod = selectedMethod === 'All' || enc.method === selectedMethod;
+      const matchesMethod =
+        selectedMethod === 'All' ||
+        enc.method === selectedMethod ||
+        (enc.methods && enc.methods.includes(selectedMethod as any));
       return matchesWeather && matchesMethod;
     });
   }, [currentRoute, selectedWeather, selectedMethod]);
@@ -212,6 +229,19 @@ export default function App() {
   const [activeCandidate, setActiveCandidate] = useState<string | null>(null);
   const [selectedEncounter, setSelectedEncounter] = useState<RouteEncounter | null>(null);
   const spinIntervalRef = useRef<number | null>(null);
+
+  // Reset weather, method, spinning and previous selection when route changes
+  useEffect(() => {
+    if (spinIntervalRef.current) {
+      clearInterval(spinIntervalRef.current);
+      spinIntervalRef.current = null;
+    }
+    setIsSpinning(false);
+    setSelectedWeather('All');
+    setSelectedMethod('All');
+    setSelectedEncounter(null);
+    setActiveCandidate(null);
+  }, [selectedRouteId]);
 
   // Toggle sound
   const handleToggleSound = () => {
@@ -382,6 +412,20 @@ export default function App() {
               {/* Desktop Navigation Tabs */}
               <nav className="hidden md:flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
                 <button
+                  id="tab-story-button"
+                  type="button"
+                  onClick={() => setActiveTab('story')}
+                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                    activeTab === 'story'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Compass className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Modo Historia</span>
+                </button>
+
+                <button
                   id="tab-roulette-button"
                   type="button"
                   onClick={() => setActiveTab('roulette')}
@@ -465,12 +509,26 @@ export default function App() {
           </div>
 
           {/* Mobile Navigation Bar (Dedicated full-width row on small devices) */}
-          <nav className="flex md:hidden w-full bg-slate-100 dark:bg-slate-800/90 p-1 rounded-2xl border border-slate-200/90 dark:border-slate-700/90 text-xs font-bold shadow-xs">
+          <nav className="flex md:hidden w-full bg-slate-100 dark:bg-slate-800/90 p-1 rounded-2xl border border-slate-200/90 dark:border-slate-700/90 text-xs font-bold shadow-xs overflow-x-auto scrollbar-none">
+            <button
+              id="mobile-tab-story-button"
+              type="button"
+              onClick={() => setActiveTab('story')}
+              className={`flex-1 py-2 px-1.5 rounded-xl transition-all flex items-center justify-center gap-1 min-h-[42px] whitespace-nowrap ${
+                activeTab === 'story'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              <Compass className="w-4 h-4 text-indigo-500" />
+              <span>Historia</span>
+            </button>
+
             <button
               id="mobile-tab-roulette-button"
               type="button"
               onClick={() => setActiveTab('roulette')}
-              className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[42px] ${
+              className={`flex-1 py-2 px-1.5 rounded-xl transition-all flex items-center justify-center gap-1 min-h-[42px] whitespace-nowrap ${
                 activeTab === 'roulette'
                   ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-300'
@@ -518,6 +576,27 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-7 space-y-5 sm:space-y-6">
+        {/* VIEW 0: MODO HISTORIA (UNIFIED CHRONOLOGICAL TIMELINE) */}
+        {activeTab === 'story' && (
+          <StoryModeView
+            activeTenant={activeTenant}
+            history={history}
+            isWeighted={isWeighted}
+            soundEnabled={soundEnabled}
+            onSaveEncounter={handleSaveEncounter}
+            onUpdateStatus={(id, status) => handleUpdateEncounter(id, { status })}
+            onDeleteEncounter={handleDeleteEncounter}
+            onOpenManualPicker={(route, weather) => {
+              setSelectedRouteId(route.id);
+              setSelectedWeather(weather);
+              setIsManualPickerOpen(true);
+            }}
+            onOpenTenantModal={() => setIsTenantModalOpen(true)}
+            starterChoice={starterChoice}
+            onSelectStarter={handleSelectStarter}
+          />
+        )}
+
         {/* VIEW 1: ROULETTE / ENCOUNTER GENERATOR */}
         {activeTab === 'roulette' && (
           <div className="space-y-5 sm:space-y-6">
@@ -682,6 +761,7 @@ export default function App() {
             {selectedEncounter && (
               <div className="flex justify-center pt-1">
                 <EncounterResultCard
+                  key={`${currentRoute.id}-${selectedEncounter.pokemon}-${selectedEncounter.method}-${selectedEncounter.weather}-${selectedEncounter.levelRange}-${selectionMode}`}
                   encounter={selectedEncounter}
                   routeName={currentRoute.name}
                   routeId={currentRoute.id}
@@ -737,8 +817,11 @@ export default function App() {
             onUpdate={handleUpdateEncounter}
             onDelete={handleDeleteEncounter}
             onClearAll={handleClearHistory}
+            onSaveEncounter={handleSaveEncounter}
             activeTenant={activeTenant}
             onOpenTenantModal={() => setIsTenantModalOpen(true)}
+            starterChoice={starterChoice}
+            onSelectStarter={handleSelectStarter}
           />
         )}
 
