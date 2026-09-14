@@ -20,11 +20,28 @@ import { GameTenantModal } from './components/GameTenantModal';
 import { GameTenantSelector } from './components/GameTenantSelector';
 import { ManualPokemonPickerModal } from './components/ManualPokemonPickerModal';
 import { sfx } from './utils/audio';
+import { STARTERS_INFO, isStarterEncounter, starterEncounterUpdates } from './data/trainers/trainerTranslations';
+import {
+  cn,
+  panel,
+  panelLg,
+  card,
+  btn,
+  iconBtn,
+  pill,
+  pillShape,
+  text,
+  surface,
+  layout,
+  segmented,
+  focusRing,
+  bottomNavItem,
+  TONES,
+} from './utils/ui';
 import {
   Sparkles,
   Volume2,
   VolumeX,
-  Compass,
   BookmarkCheck,
   Layers,
   Dice5,
@@ -33,8 +50,10 @@ import {
   Moon,
   SlidersHorizontal,
   ChevronDown,
-  Gamepad2,
   Hand,
+  BookOpen,
+  Heart,
+  Skull,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -67,6 +86,7 @@ export default function App() {
   const [isTenantModalOpen, setIsTenantModalOpen] = useState<boolean>(false);
   const [isManualPickerOpen, setIsManualPickerOpen] = useState<boolean>(false);
   const [selectionMode, setSelectionMode] = useState<'random' | 'manual'>('random');
+  const [lastManualSaveId, setLastManualSaveId] = useState<string | null>(null);
 
   // Active navigation tab (Modo Historia is the primary adventure view)
   const [activeTab, setActiveTab] = useState<'story' | 'roulette' | 'history' | 'database'>('story');
@@ -147,6 +167,11 @@ export default function App() {
     try {
       localStorage.setItem(STARTER_STORAGE_KEY, st);
     } catch {}
+
+    const updates = starterEncounterUpdates(st);
+    setHistory((prev) =>
+      prev.map((item) => (isStarterEncounter(item) ? { ...item, ...updates } : item))
+    );
   };
 
   // When active tenant changes, reload that tenant's history
@@ -188,6 +213,7 @@ export default function App() {
     } catch {}
     setSelectedEncounter(null);
     setActiveCandidate(null);
+    setLastManualSaveId(null);
   };
 
   const handleAddCustomTenant = (newTenant: GameTenant) => {
@@ -241,6 +267,7 @@ export default function App() {
     setSelectedMethod('All');
     setSelectedEncounter(null);
     setActiveCandidate(null);
+    setLastManualSaveId(null);
   }, [selectedRouteId]);
 
   // Toggle sound
@@ -257,6 +284,7 @@ export default function App() {
     setSelectionMode('random');
     setIsSpinning(true);
     setSelectedEncounter(null);
+    setLastManualSaveId(null);
 
     // Pick candidates for spinning animation
     const candidateNames = Array.from(new Set(availableEncounters.map((e) => e.pokemon)));
@@ -316,14 +344,34 @@ export default function App() {
     }, 85);
   };
 
-  // Choose Pokémon by hand ("a dedo")
+  // Choose Pokémon by hand ("a dedo") and persist it as the route encounter
   const handleSelectManualPokemon = (chosen: RouteEncounter) => {
-    if (isSpinning) return;
+    if (isSpinning || !currentRoute) return;
     setSelectionMode('manual');
     setSelectedEncounter(chosen);
     setActiveCandidate(chosen.pokemon);
 
+    const newSaved: SavedEncounter = {
+      id: `enc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: Date.now(),
+      routeId: currentRoute.id,
+      routeName: currentRoute.name,
+      pokemon: chosen.pokemon,
+      cleanName: chosen.cleanName,
+      formLabel: chosen.formLabel,
+      method: chosen.method || 'Visible',
+      weather: chosen.weather || selectedWeather,
+      levelRange: chosen.levelRange,
+      chance: chosen.chance,
+      status: 'Capturado',
+      notes: 'Elegido a dedo',
+      isShiny: false,
+    };
+    handleSaveEncounter(newSaved);
+    setLastManualSaveId(newSaved.id);
+
     sfx.playReveal();
+    sfx.playCatch();
     confetti({
       particleCount: 60,
       spread: 65,
@@ -331,9 +379,13 @@ export default function App() {
       colors: ['#f59e0b', '#ef4444', '#10b981'],
     });
 
-    // Auto-scroll gently to the encounter result card
+    // Auto-scroll to the updated story card or the roulette result card
+    const routeId = currentRoute.id;
+    const tab = activeTab;
     setTimeout(() => {
-      const el = document.getElementById('encounter-result-card');
+      const targetId =
+        tab === 'story' ? `story-route-${routeId}` : 'encounter-result-card';
+      const el = document.getElementById(targetId);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
@@ -366,7 +418,6 @@ export default function App() {
     setHistory((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Clear all history for current tenant
   const handleClearHistory = () => {
     setHistory([]);
     try {
@@ -377,205 +428,144 @@ export default function App() {
     }
   };
 
+  const lockeStats = useMemo(() => {
+    const alive = history.filter(
+      (h) => h.status === 'En Equipo' || h.status === 'Capturado' || h.status === 'En Caja'
+    ).length;
+    const fainted = history.filter((h) => h.status === 'Debilitado').length;
+    const uniqueRoutes = new Set(history.map((h) => h.routeId)).size;
+    const totalRoutes = allRoutes.length || 1;
+    const percentage = Math.round((uniqueRoutes / totalRoutes) * 1000) / 10;
+    return { alive, fainted, percentage };
+  }, [history, allRoutes.length]);
+
+  const navBtn = (tab: typeof activeTab, label: string, icon: React.ReactNode) => {
+    const active = activeTab === tab;
+    return (
+      <button
+        type="button"
+        onClick={() => setActiveTab(tab)}
+        title={label}
+        className={segmented.item(active)}
+      >
+        {icon}
+        <span className="hidden lg:inline">{label}</span>
+      </button>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100/90 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-red-500 selection:text-white transition-colors duration-200">
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/90 dark:border-slate-800 shadow-xs transition-colors">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3.5 flex flex-col gap-2.5">
-          {/* Main Top Row: Brand + Controls */}
-          <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-            {/* Brand Logo & Dynamic Title */}
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 flex items-center justify-center shadow-md shadow-red-500/30 text-white font-bold text-lg select-none flex-shrink-0">
-                <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-slate-900 block" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-sm sm:text-base md:text-lg font-black tracking-tight text-slate-900 dark:text-white leading-tight truncate">
-                    {activeTenant.name}
-                  </h1>
-                </div>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hidden sm:block truncate">
-                  Ruleta de encuentros oficiales • {activeTenant.region} ({activeTenant.generation})
-                </p>
-              </div>
+    <div className={cn('min-h-screen flex flex-col font-sans antialiased selection:bg-brand-accent selection:text-white transition-colors duration-200', surface.page)}>
+      <header className={cn('sticky top-0 z-50 w-full overflow-x-hidden', surface.header)}>
+        <div className={cn(layout.container, 'h-14 flex items-center gap-2 sm:gap-3')}>
+          <div className="flex items-center gap-2.5 shrink-0 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-brand-accent flex items-center justify-center shrink-0 shadow-sm shadow-brand-accent/30">
+              <span className="w-3 h-3 rounded-full border-2 border-white bg-brand-bg block" />
             </div>
-
-            {/* Tenant Selector & Quick Action Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
-              {/* Multi-Tenancy Game Selector Button */}
-              <GameTenantSelector
-                activeTenant={activeTenant}
-                onClick={() => setIsTenantModalOpen(true)}
-              />
-
-              {/* Desktop Navigation Tabs */}
-              <nav className="hidden md:flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
-                <button
-                  id="tab-story-button"
-                  type="button"
-                  onClick={() => setActiveTab('story')}
-                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                    activeTab === 'story'
-                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Compass className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Modo Historia</span>
-                </button>
-
-                <button
-                  id="tab-roulette-button"
-                  type="button"
-                  onClick={() => setActiveTab('roulette')}
-                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                    activeTab === 'roulette'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Dice5 className="w-3.5 h-3.5 text-red-500" />
-                  <span>Ruleta</span>
-                </button>
-
-                <button
-                  id="tab-history-button"
-                  type="button"
-                  onClick={() => setActiveTab('history')}
-                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 relative ${
-                    activeTab === 'history'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <BookmarkCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Bitácora</span>
-                  {history.length > 0 && (
-                    <span className="ml-1 px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-extrabold rounded-full">
-                      {history.length}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  id="tab-database-button"
-                  type="button"
-                  onClick={() => setActiveTab('database')}
-                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                    activeTab === 'database'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Base de Datos</span>
-                </button>
-              </nav>
-
-              {/* Dark Mode Toggle */}
-              <button
-                id="theme-toggle-button"
-                type="button"
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="p-2 sm:px-2.5 sm:py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 text-xs font-semibold"
-                title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-                aria-label={isDarkMode ? 'Modo claro' : 'Modo oscuro'}
-              >
-                {isDarkMode ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-slate-600" />
-                )}
-                <span className="hidden lg:inline">{isDarkMode ? 'Claro' : 'Oscuro'}</span>
-              </button>
-
-              {/* Sound Mute/Unmute */}
-              <button
-                id="sound-toggle-button"
-                type="button"
-                onClick={handleToggleSound}
-                className={`p-2 rounded-xl border transition-colors ${
-                  soundEnabled
-                    ? 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 border-rose-200 dark:border-rose-800'
-                }`}
-                title={soundEnabled ? 'Silenciar sonidos' : 'Activar sonidos'}
-                aria-label={soundEnabled ? 'Silenciar' : 'Sonido activado'}
-              >
-                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </button>
+            <div className="hidden sm:flex flex-col min-w-0">
+              <span className={cn(text.subtitle, 'uppercase leading-tight truncate')}>
+                Nuzlocke Tracker
+              </span>
+              <span className={cn(text.meta, 'font-medium leading-none truncate')}>
+                {activeTenant.shortName || activeTenant.name} · {activeTenant.region}
+              </span>
             </div>
           </div>
 
-          {/* Mobile Navigation Bar (Dedicated full-width row on small devices) */}
-          <nav className="flex md:hidden w-full bg-slate-100 dark:bg-slate-800/90 p-1 rounded-2xl border border-slate-200/90 dark:border-slate-700/90 text-xs font-bold shadow-xs overflow-x-auto scrollbar-none">
+          <div className="hidden lg:flex flex-1 justify-center min-w-0">
+            <nav className={segmented.group}>
+              {navBtn('story', 'Historia', <BookOpen className={cn('w-3.5 h-3.5', activeTab === 'story' && 'text-brand-accent')} />)}
+              {navBtn('roulette', 'Ruleta', <Dice5 className="w-3.5 h-3.5" />)}
+              {navBtn('history', 'Bitácora', <BookmarkCheck className="w-3.5 h-3.5" />)}
+              {navBtn('database', 'Datos', <Layers className="w-3.5 h-3.5" />)}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+            {activeTenant.id === 'blessed-shield' && (
+              <div className={cn(segmented.group, 'max-lg:hidden')}>
+                {(['grookey', 'scorbunny', 'sobble'] as StarterChoice[]).map((st) => {
+                  const isSel = starterChoice === st;
+                  const typeClass =
+                    st === 'grookey'
+                      ? 'bg-pokemon-planta'
+                      : st === 'scorbunny'
+                        ? 'bg-pokemon-fuego'
+                        : 'bg-pokemon-agua';
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => handleSelectStarter(st)}
+                      title={`Inicial: ${STARTERS_INFO[st].name}`}
+                      aria-label={`Elegir a ${STARTERS_INFO[st].name} como inicial`}
+                      className={cn(
+                        'w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition-all duration-150',
+                        focusRing,
+                        isSel ? cn(typeClass, 'shadow-xs') : 'hover:bg-brand-card/60'
+                      )}
+                    >
+                      <img
+                        src={STARTERS_INFO[st].sprite}
+                        alt=""
+                        className={cn('w-9 h-9 pointer-events-none object-contain', !isSel && 'opacity-50 grayscale')}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className={cn(segmented.group, 'gap-1.5 px-2 py-1 tabular-nums')}>
+              <span className={cn('flex items-center gap-0.5 text-xs font-semibold', TONES.success.ink)} title="Pokémon vivos / en caja">
+                <Heart className="w-3 h-3" />
+                {lockeStats.alive}
+              </span>
+              <span className="text-brand-border">·</span>
+              <span className={cn('flex items-center gap-0.5 text-xs font-semibold', TONES.danger.ink)} title="Bajas registradas">
+                <Skull className="w-3 h-3" />
+                {lockeStats.fainted}
+              </span>
+              <span className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-brand-txt1" title="Progreso de rutas">
+                <span className="text-brand-border">·</span>
+                {lockeStats.percentage}%
+              </span>
+            </div>
+
+            <GameTenantSelector
+              activeTenant={activeTenant}
+              onClick={() => setIsTenantModalOpen(true)}
+            />
+
             <button
-              id="mobile-tab-story-button"
+              id="theme-toggle-button"
               type="button"
-              onClick={() => setActiveTab('story')}
-              className={`flex-1 py-2 px-1.5 rounded-xl transition-all flex items-center justify-center gap-1 min-h-[42px] whitespace-nowrap ${
-                activeTab === 'story'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className={iconBtn('secondary', 'sm')}
+              title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              aria-label={isDarkMode ? 'Modo claro' : 'Modo oscuro'}
             >
-              <Compass className="w-4 h-4 text-indigo-500" />
-              <span>Historia</span>
+              {isDarkMode ? <Sun className={cn('w-4 h-4', TONES.warning.ink)} /> : <Moon className="w-4 h-4" />}
             </button>
 
             <button
-              id="mobile-tab-roulette-button"
+              id="sound-toggle-button"
               type="button"
-              onClick={() => setActiveTab('roulette')}
-              className={`flex-1 py-2 px-1.5 rounded-xl transition-all flex items-center justify-center gap-1 min-h-[42px] whitespace-nowrap ${
-                activeTab === 'roulette'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
+              onClick={handleToggleSound}
+              className={soundEnabled ? iconBtn('secondary', 'sm') : iconBtn('soft', 'sm', 'danger')}
+              title={soundEnabled ? 'Silenciar sonidos' : 'Activar sonidos'}
+              aria-label={soundEnabled ? 'Silenciar' : 'Sonido activado'}
             >
-              <Dice5 className="w-4 h-4 text-red-500" />
-              <span>Ruleta</span>
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
-
-            <button
-              id="mobile-tab-history-button"
-              type="button"
-              onClick={() => setActiveTab('history')}
-              className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[42px] relative ${
-                activeTab === 'history'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              <BookmarkCheck className="w-4 h-4 text-emerald-500" />
-              <span>Bitácora</span>
-              {history.length > 0 && (
-                <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[10px] font-extrabold rounded-full">
-                  {history.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              id="mobile-tab-database-button"
-              type="button"
-              onClick={() => setActiveTab('database')}
-              className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[42px] ${
-                activeTab === 'database'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              <Layers className="w-4 h-4 text-indigo-500" />
-              <span>Rutas</span>
-            </button>
-          </nav>
+          </div>
         </div>
+
       </header>
 
+
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-7 space-y-5 sm:space-y-6">
+      <main className={cn('flex-1 pt-6 pb-24 lg:py-6 space-y-6', layout.container)}>
         {/* VIEW 0: MODO HISTORIA (UNIFIED CHRONOLOGICAL TIMELINE) */}
         {activeTab === 'story' && (
           <StoryModeView
@@ -599,7 +589,7 @@ export default function App() {
 
         {/* VIEW 1: ROULETTE / ENCOUNTER GENERATOR */}
         {activeTab === 'roulette' && (
-          <div className="space-y-5 sm:space-y-6">
+          <div className={layout.view}>
             {/* 1. Sleek Route Bar: Minimal single-row navigation */}
             <QuickRouteBar
               routes={allRoutes}
@@ -611,18 +601,16 @@ export default function App() {
             {/* 2. PRIMARY HERO: The Interactive Pokemon Selection Stage */}
             <div
               id="roulette-interactive-stage"
-              className="bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-950 rounded-3xl p-6 sm:p-9 border border-slate-200/90 dark:border-slate-800 shadow-md flex flex-col items-center justify-center text-center relative overflow-hidden transition-colors"
+              className={panelLg('flex flex-col items-center justify-center text-center relative overflow-hidden')}
             >
-              {/* Background ambient decor */}
-              <div className="absolute top-0 right-0 w-80 h-80 bg-red-500/5 dark:bg-red-500/10 rounded-full blur-3xl -z-0 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-3xl -z-0 pointer-events-none" />
+              <div className="absolute -right-10 -top-10 w-44 h-44 bg-brand-accent/15 rounded-full blur-3xl pointer-events-none" />
 
               {/* Title & Description (without duplicate route name/level badges) */}
               <div className="relative z-10 space-y-1 mb-4 text-center">
-                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                <h2 className={text.pageTitle}>
                   Elección de Pokémon Aleatorio
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                <p className={cn(text.muted, 'max-w-md mx-auto')}>
                   {isWeighted
                     ? 'Probabilidades basadas en el porcentaje oficial de aparición en esta ruta'
                     : 'Modo equitativo: todos los Pokémon disponibles tienen exactamente la misma probabilidad'}
@@ -642,21 +630,15 @@ export default function App() {
               )}
 
               {/* Roll Action Button & Manual Pick ("A Dedo") */}
-              <div className="relative z-10 mt-5 w-full max-w-md flex flex-col sm:flex-row items-center justify-center gap-2.5">
+              <div className="relative z-10 mt-5 w-full max-w-md flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
                   id="roll-pokemon-button"
                   type="button"
                   onClick={handleRoll}
                   disabled={isSpinning || availableEncounters.length === 0}
-                  className={`w-full sm:flex-1 py-3.5 sm:py-4 px-5 rounded-2xl font-black text-sm sm:text-base uppercase tracking-wider shadow-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                    isSpinning
-                      ? 'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-not-allowed'
-                      : availableEncounters.length === 0
-                      ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.98] text-white shadow-red-600/30 cursor-pointer'
-                  }`}
+                  className={btn('primary', 'lg', 'accent', 'w-full sm:flex-1')}
                 >
-                  <Sparkles className={`w-5 h-5 ${isSpinning ? 'animate-spin' : ''}`} />
+                  <Sparkles className={cn('w-5 h-5', isSpinning && 'animate-spin')} />
                   <span>
                     {isSpinning
                       ? '¡Girando Ruleta...!'
@@ -672,9 +654,9 @@ export default function App() {
                   onClick={() => setIsManualPickerOpen(true)}
                   disabled={isSpinning || currentRoute.encounters.length === 0}
                   title="Elegir manualmente a dedo un Pokémon de esta ruta"
-                  className="w-full sm:w-auto py-3.5 sm:py-4 px-5 rounded-2xl font-black text-sm sm:text-base uppercase tracking-wider border-2 border-amber-500/80 bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-amber-700 dark:text-amber-300 shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                  className={btn('soft', 'lg', 'warning', 'w-full sm:w-auto')}
                 >
-                  <Hand className="w-5 h-5 text-amber-500" />
+                  <Hand className="w-5 h-5" />
                   <span>Elegir a Dedo</span>
                 </button>
               </div>
@@ -685,41 +667,31 @@ export default function App() {
                   id="toggle-filters-stage-button"
                   type="button"
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold border-2 transition-all flex items-center gap-2 shadow-sm select-none cursor-pointer ${
-                    showFilters
-                      ? 'bg-red-600 hover:bg-red-700 text-white hover:text-white border-red-600 hover:border-red-700 shadow-md shadow-red-500/20'
-                      : 'bg-white hover:bg-red-50 text-slate-900 hover:text-red-700 border-slate-300 hover:border-red-400 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white dark:hover:text-white dark:border-slate-700 dark:hover:border-red-500'
-                  }`}
+                  className={btn(showFilters ? 'primary' : 'soft', 'md', 'accent')}
                 >
-                  <SlidersHorizontal
-                    className={`w-4 h-4 flex-shrink-0 transition-colors ${
-                      showFilters ? 'text-white' : 'text-red-600 dark:text-red-400'
-                    }`}
-                  />
-                  <span className="font-extrabold">
+                  <SlidersHorizontal className="w-4 h-4 shrink-0" />
+                  <span>
                     {showFilters ? 'Ocultar Carrusel de Filtros' : 'Filtros y Condiciones de Ruta'}
                   </span>
-                  <span
-                    className={`px-2 py-0.5 rounded-lg text-xs font-black transition-colors ${
-                      showFilters
-                        ? 'bg-red-800 text-white'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 group-hover:bg-red-100'
-                    }`}
-                  >
+                  <span className={pill('neutral', 'xs')}>
                     {availableEncounters.length}
                   </span>
                   <ChevronDown
-                    className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${
-                      showFilters ? 'rotate-180 text-white' : 'text-slate-600 dark:text-slate-300'
-                    }`}
+                    className={cn('w-4 h-4 shrink-0 transition-transform duration-200', showFilters && 'rotate-180')}
                   />
                 </button>
               </div>
 
               {/* Warning if 0 encounters with filters */}
               {availableEncounters.length === 0 && (
-                <div className="relative z-10 mt-4 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-4 py-2.5 rounded-2xl max-w-md">
-                  <Info className="w-4 h-4 flex-shrink-0" />
+                <div
+                  className={card({
+                    tone: 'warning',
+                    padding: 'compact',
+                    extra: 'relative z-10 mt-4 flex items-center gap-2 text-xs max-w-md',
+                  })}
+                >
+                  <Info className="w-4 h-4 shrink-0" />
                   <div className="text-left">
                     <span>No hay Pokémon con ese clima o método en {currentRoute?.name}.</span>
                     <button
@@ -728,7 +700,7 @@ export default function App() {
                         setSelectedWeather('All');
                         setSelectedMethod('All');
                       }}
-                      className="block mt-1 font-bold underline hover:no-underline"
+                      className={cn(text.link, 'block mt-1')}
                     >
                       Restablecer a &quot;Cualquier Clima y Método&quot;
                     </button>
@@ -766,6 +738,9 @@ export default function App() {
                   routeName={currentRoute.name}
                   routeId={currentRoute.id}
                   onSave={handleSaveEncounter}
+                  onUpdate={handleUpdateEncounter}
+                  existingSavedId={lastManualSaveId ?? undefined}
+                  isAlreadySaved={Boolean(lastManualSaveId)}
                   selectionMode={selectionMode}
                 />
               </div>
@@ -773,16 +748,16 @@ export default function App() {
 
             {/* 5. Recent encounters registered in this specific route */}
             {history.filter((h) => h.routeId === currentRoute.id).length > 0 && (
-              <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-3 transition-colors">
+              <div className={panel('space-y-3')}>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <BookmarkCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <h3 className={cn(text.label, 'flex items-center gap-1.5')}>
+                    <BookmarkCheck className={cn('w-4 h-4', TONES.success.ink)} />
                     Encuentros registrados previamente en {currentRoute.name}
                   </h3>
                   <button
                     type="button"
                     onClick={() => setActiveTab('history')}
-                    className="text-xs font-semibold text-red-600 dark:text-red-400 hover:underline"
+                    className={cn(text.link, 'text-xs')}
                   >
                     Ver bitácora completa ({history.length})
                   </button>
@@ -792,14 +767,11 @@ export default function App() {
                   {history
                     .filter((h) => h.routeId === currentRoute.id)
                     .map((item) => (
-                      <div
-                        key={item.id}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-2"
-                      >
-                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                      <div key={item.id} className={pill('neutral', 'md', 'gap-2')}>
+                        <span className="text-brand-txt1">
                           {item.nickname ? `${item.nickname} (${item.cleanName})` : item.cleanName}
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-700">
+                        <span className={pillShape('xs', 'bg-brand-card border-brand-border text-brand-txt2')}>
                           {item.status}
                         </span>
                       </div>
@@ -864,13 +836,36 @@ export default function App() {
         />
       )}
 
+      <nav className={surface.bottomNav} aria-label="Navegación principal">
+        <button type="button" onClick={() => setActiveTab('story')} className={bottomNavItem(activeTab === 'story')}>
+          <BookOpen className="w-5 h-5" />
+          Historia
+        </button>
+        <button type="button" onClick={() => setActiveTab('roulette')} className={bottomNavItem(activeTab === 'roulette')}>
+          <Dice5 className="w-5 h-5" />
+          Ruleta
+        </button>
+        <button type="button" onClick={() => setActiveTab('history')} className={bottomNavItem(activeTab === 'history')}>
+          <BookmarkCheck className="w-5 h-5" />
+          Bitácora
+        </button>
+        <button type="button" onClick={() => setActiveTab('database')} className={bottomNavItem(activeTab === 'database')}>
+          <Layers className="w-5 h-5" />
+          Datos
+        </button>
+      </nav>
+
       {/* Footer */}
-      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200/90 dark:border-slate-800 py-6 text-center text-xs text-slate-400 dark:text-slate-500 transition-colors">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>© {new Date().getFullYear()} Ruleta Pokémon por Ruta • Datos de encuentros fieles a la base de conocimiento</p>
-          <p className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
-            <span>Diseñado para Nuzlockes y partidas temáticas</span>
-          </p>
+      <footer className={cn('w-full py-6 mt-8 mb-16 lg:mb-0', surface.footer)}>
+        <div className={cn(layout.container, 'flex flex-col md:flex-row items-center justify-between gap-4', text.muted)}>
+          <div className="flex items-center gap-2 flex-wrap justify-center">
+            <span className="font-bold text-brand-txt1 uppercase">Nuzlocke Tracker Core</span>
+            <span className="text-brand-border">•</span>
+            <span>Reglas Hardcore Activas</span>
+            <span className="text-brand-border">•</span>
+            <span className="text-status-live font-medium">Dupes Clause ON</span>
+          </div>
+          <span>Desarrollado para {activeTenant.name} · {activeTenant.region}</span>
         </div>
       </footer>
     </div>

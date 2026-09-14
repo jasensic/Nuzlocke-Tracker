@@ -1,9 +1,33 @@
 import React, { useState, useMemo } from 'react';
-import { RouteData, RouteEncounter, SavedEncounter, EncounterMethod } from '../types';
+import { RouteData, RouteEncounter, SavedEncounter, StarterChoice } from '../types';
 import { parsePokemonName, getPokemonSprite } from '../utils/pokemonMeta';
 import { WEATHER_TRANSLATIONS } from '../data/routeTranslations';
+import {
+  STARTER_CHOICES,
+  STARTERS_INFO,
+  buildStarterEncounter,
+  isStarterGiftRoute,
+} from '../data/trainers/trainerTranslations';
 import { usePokeDetail } from '../context/PokeDetailContext';
 import { sfx } from '../utils/audio';
+import { TypeBadge } from './TypeBadge';
+import {
+  cn,
+  card,
+  inset,
+  btn,
+  iconBtn,
+  pill,
+  pillSolid,
+  text,
+  pad,
+  filterChip,
+  segmented,
+  spriteFrame,
+  focusRing,
+  TONES,
+  type Tone,
+} from '../utils/ui';
 import confetti from 'canvas-confetti';
 import {
   Sparkles,
@@ -15,12 +39,13 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  MapPin,
   CloudSun,
-  Shield,
   Heart,
   Skull,
-  HelpCircle,
+  Award,
+  Leaf,
+  Flame,
+  Droplets,
 } from 'lucide-react';
 
 interface StoryRouteCardProps {
@@ -34,7 +59,10 @@ interface StoryRouteCardProps {
   onUpdateStatus: (id: string, status: SavedEncounter['status']) => void;
   onDeleteEncounter: (id: string) => void;
   onOpenManualPicker: (route: RouteData, weather: string) => void;
+  starterChoice?: StarterChoice;
+  onSelectStarter?: (starter: StarterChoice) => void;
   compact?: boolean;
+  hideStepBadge?: boolean;
 }
 
 export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
@@ -48,7 +76,10 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
   onUpdateStatus,
   onDeleteEncounter,
   onOpenManualPicker,
+  starterChoice,
+  onSelectStarter,
   compact = false,
+  hideStepBadge = false,
 }) => {
   const { openDetail } = usePokeDetail();
   const [selectedWeather, setSelectedWeather] = useState<string>(() => {
@@ -80,6 +111,19 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
     });
     return Array.from(map.values()).sort((a, b) => b.totalChance - a.totalChance);
   }, [availableEncounters]);
+
+  const dominantTypes = useMemo(() => {
+    const counts = new Map<string, number>();
+    uniqueEncounters.forEach(({ enc }) => {
+      parsePokemonName(enc.pokemon).types.forEach((t) => {
+        counts.set(t, (counts.get(t) || 0) + 1);
+      });
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([t]) => t);
+  }, [uniqueEncounters]);
 
   // Handle spin for this specific route
   const handleSpinRoute = () => {
@@ -154,99 +198,165 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
     }, interval);
   };
 
+  const isStarterRoute = isStarterGiftRoute(route.id);
+  const activeStarter: StarterChoice =
+    starterChoice ||
+    (savedEncounter?.cleanName.toLowerCase() === 'scorbunny'
+      ? 'scorbunny'
+      : savedEncounter?.cleanName.toLowerCase() === 'sobble'
+        ? 'sobble'
+        : 'grookey');
+
+  const handleChooseStarter = (st: StarterChoice) => {
+    onSelectStarter?.(st);
+    if (savedEncounter) return;
+
+    onSaveEncounter(buildStarterEncounter(st));
+    if (soundEnabled) {
+      sfx.playReveal();
+      sfx.playCatch();
+    }
+    confetti({
+      particleCount: 50,
+      spread: 60,
+      origin: { y: 0.7 },
+    });
+  };
+
   const isCaught = Boolean(savedEncounter);
 
   // Metas for saved Pokémon
   const caughtMeta = savedEncounter ? parsePokemonName(savedEncounter.pokemon) : null;
   const caughtSprites = savedEncounter ? getPokemonSprite(savedEncounter.pokemon) : null;
 
-  const categoryColor =
+  const categoryColor: Tone =
     route.category === 'Ruta'
-      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+      ? 'success'
       : route.category === 'Cueva/Mina'
-      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+      ? 'warning'
       : route.category === 'Ciudad/Pueblo'
-      ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-800'
-      : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800';
+      ? 'info'
+      : 'accent';
 
   // COMPACT MODE: Space-saving single/dual-line card
   if (compact) {
     return (
       <article
         id={`story-route-${route.id}`}
-        className={`rounded-2xl border transition-all scroll-mt-24 p-3 sm:p-3.5 shadow-2xs ${
-          isCaught
-            ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/90 dark:border-emerald-800/70'
-            : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800'
-        }`}
+        className={cn(
+          card({
+            tone: isCaught ? 'success' : undefined,
+            interactive: true,
+            padding: 'compact',
+          }),
+          'scroll-mt-24'
+        )}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          {/* Left: Step, Route, Pokemon/Level */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-black ${
-                isCaught
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              {isCaught ? <CheckCircle2 className="w-4 h-4" /> : `#${stepNumber}`}
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-black text-sm text-slate-900 dark:text-white truncate">
-                  {route.name}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {!hideStepBadge && (
+                <span className={pill('neutral')}>
+                  Hito #{stepNumber}
                 </span>
-                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                  ({route.levelDisplay})
+              )}
+              <span className={pill(categoryColor)}>
+                {chapterTitle.split(':')[0]} · {route.category}
+              </span>
+              <h3 className={text.sectionTitle}>{route.name}</h3>
+              {route.englishName && (
+                <span className={text.muted}>({route.englishName})</span>
+              )}
+              {isCaught ? (
+                <span className={pill('success')}>
+                  Completado
                 </span>
-              </div>
-
-              {isCaught && savedEncounter && caughtMeta && caughtSprites ? (
-                <button
-                  type="button"
-                  onClick={() => openDetail('pokemon', caughtMeta.cleanName)}
-                  className="flex items-center gap-2 mt-0.5 text-left cursor-pointer hover:opacity-80 transition-opacity"
-                  title={`Haz clic para ver estadísticas y detalles de ${caughtMeta.displayName}`}
-                >
-                  <img
-                    src={caughtSprites.sprite}
-                    alt={caughtMeta.displayName}
-                    className="w-5 h-5 object-contain pixelated flex-shrink-0"
-                  />
-                  <span className="text-xs font-black text-emerald-800 dark:text-emerald-300 truncate">
-                    {savedEncounter.nickname ? `${savedEncounter.nickname} (${caughtMeta.cleanName})` : caughtMeta.cleanName}
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
-                    {savedEncounter.status}
-                  </span>
-                </button>
               ) : (
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {availableEncounters.length} Pokémon posibles
-                </div>
+                <span className={pill('warning')}>
+                  Pendiente
+                </span>
+              )}
+            </div>
+            <div className={cn('flex items-center gap-3 flex-wrap', text.muted)}>
+              <span className={pill('info', 'sm')}>
+                Nivel Límite: <strong>{route.levelDisplay}</strong>
+              </span>
+              {isStarterRoute ? (
+                <span className={text.meta}>
+                  Pokémon inicial entregado por Lionel
+                </span>
+              ) : (
+                <>
+                  {dominantTypes.length > 0 && (
+                    <>
+                      <span>Tipos presentes:</span>
+                      <div className="inline-flex items-center gap-1.5">
+                        {dominantTypes.map((t) => (
+                          <TypeBadge key={t} type={t} />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <span className={text.meta}>
+                    · ({uniqueEncounters.slice(0, 3).map((u) => u.enc.cleanName).join(', ')})
+                  </span>
+                </>
               )}
             </div>
           </div>
-
-          {/* Right: Quick actions */}
-          <div className="flex items-center gap-1.5 self-end sm:self-center flex-shrink-0">
-            {isCaught && savedEncounter ? (
+          <div className="flex items-center gap-2 shrink-0">
+            {isStarterRoute ? (
+              <>
+                {STARTER_CHOICES.map((st) => {
+                  const meta = STARTERS_INFO[st];
+                  const isSelected = isCaught
+                    ? savedEncounter?.cleanName.toLowerCase() === meta.species.toLowerCase()
+                    : activeStarter === st;
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => handleChooseStarter(st)}
+                      title={`Recibir a ${meta.name} como inicial`}
+                      aria-label={`Elegir a ${meta.name} como inicial`}
+                      className={cn(
+                        spriteFrame(true, 'w-10 h-10 p-0.5'),
+                        isSelected && 'border-brand-accent/60 ring-1 ring-brand-accent/25'
+                      )}
+                    >
+                      <img
+                        src={meta.sprite}
+                        alt={meta.name}
+                        className={cn('w-8 h-8 object-contain', !isSelected && 'opacity-50 grayscale')}
+                      />
+                    </button>
+                  );
+                })}
+                {isCaught && savedEncounter && (
+                  <button
+                    type="button"
+                    onClick={() => onDeleteEncounter(savedEncounter.id)}
+                    className={iconBtn('soft', 'sm', 'danger')}
+                    title="Eliminar captura"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
+            ) : isCaught && savedEncounter ? (
               <>
                 <button
                   type="button"
                   onClick={handleSpinRoute}
-                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1"
+                  className={iconBtn('secondary')}
                   title="Volver a girar ruleta"
                 >
-                  <RotateCcw className="w-3 h-3 text-indigo-500" />
-                  <span className="hidden xs:inline">Regirar</span>
+                  <RotateCcw className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => onDeleteEncounter(savedEncounter.id)}
-                  className="p-1.5 rounded-xl text-xs bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 dark:text-red-400"
+                  className={iconBtn('soft', 'sm', 'danger')}
                   title="Eliminar captura"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -258,18 +368,18 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                   type="button"
                   onClick={handleSpinRoute}
                   disabled={isSpinning || availableEncounters.length === 0}
-                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                  className={btn('primary', 'md')}
                 >
-                  <Dice5 className={`w-3.5 h-3.5 ${isSpinning ? 'animate-spin' : ''}`} />
+                  <Dice5 className={cn('w-3.5 h-3.5', isSpinning && 'animate-spin')} />
                   <span>{isSpinning ? (candidateName || 'Girando...') : 'Girar Ruleta'}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onOpenManualPicker(route, selectedWeather)}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300"
+                  className={iconBtn('secondary')}
                   title="Elegir manualmente"
                 >
-                  <Hand className="w-3.5 h-3.5 text-indigo-500" />
+                  <Hand className="w-3.5 h-3.5" />
                 </button>
               </>
             )}
@@ -282,59 +392,84 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
   return (
     <article
       id={`story-route-${route.id}`}
-      className={`rounded-3xl border transition-all scroll-mt-24 ${
-        isCaught
-          ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200/90 dark:border-emerald-800/80 shadow-xs'
-          : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 shadow-sm'
-      }`}
+      className={cn(
+        card({
+          tone: isCaught ? 'success' : undefined,
+          interactive: true,
+          padding: 'none',
+        }),
+        'scroll-mt-24 overflow-hidden'
+      )}
     >
       {/* Route Header */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
+      <div
+        className={cn(
+          pad.card,
+          'border-b border-brand-border flex flex-col sm:flex-row sm:items-center justify-between gap-3'
+        )}
+      >
+        <div className="flex items-center gap-3">
           {/* Step Icon Badge */}
           <div
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center flex-shrink-0 border-2 ${
+            className={cn(
+              'w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center shrink-0 border',
               isCaught
-                ? 'bg-emerald-600 border-emerald-500 text-white shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-            }`}
+                ? cn(TONES.success.solid, 'border-transparent shadow-xs')
+                : 'bg-brand-surface border-brand-border text-brand-txt2'
+            )}
           >
             {isCaught ? (
               <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
+            ) : isStarterRoute ? (
+              <Award className={cn('w-6 h-6 sm:w-7 sm:h-7', TONES.warning.ink)} />
             ) : (
-              <Dice5 className="w-6 h-6 sm:w-7 sm:h-7 text-red-500" />
+              <Dice5 className={cn('w-6 h-6 sm:w-7 sm:h-7', TONES.accent.ink)} />
             )}
           </div>
 
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+              <span className={pillSolid('neutral')}>
                 Paso #{stepNumber}
               </span>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+              <h3 className={text.sectionTitle}>
                 {route.name}
               </h3>
               {route.englishName && route.englishName !== route.name && (
-                <span className="text-xs text-slate-400 font-medium">({route.englishName})</span>
+                <span className={text.muted}>({route.englishName})</span>
               )}
-              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${categoryColor}`}>
+              <span className={pill(categoryColor)}>
                 {route.category}
               </span>
+              {isStarterRoute && (
+                <span className={pillSolid('warning')}>
+                  <Award className="w-3 h-3" /> Inicial
+                </span>
+              )}
             </div>
 
-            <div className="flex items-center gap-2.5 mt-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
-              <span className="font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-200/80 dark:border-indigo-800/80">
+            <div className={cn('flex items-center gap-2 mt-1 flex-wrap', text.muted)}>
+              <span className={pill('info', 'sm')}>
                 {route.levelDisplay}
               </span>
-              <span>•</span>
-              <span>{availableEncounters.length} encuentros posibles</span>
-              {route.weathers.length > 1 && (
+              {isStarterRoute ? (
                 <>
                   <span>•</span>
-                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
-                    <CloudSun className="w-3.5 h-3.5" />
-                    {route.weathers.length} climas
-                  </span>
+                  <span>Pokémon inicial entregado por Lionel</span>
+                </>
+              ) : (
+                <>
+                  <span>•</span>
+                  <span>{availableEncounters.length} encuentros posibles</span>
+                  {route.weathers.length > 1 && (
+                    <>
+                      <span>•</span>
+                      <span className={cn('flex items-center gap-1 font-semibold', TONES.warning.ink)}>
+                        <CloudSun className="w-3.5 h-3.5" />
+                        {route.weathers.length} climas
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -344,13 +479,18 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
         {/* Right Status Badge */}
         <div className="flex items-center gap-2 self-start sm:self-center">
           {isCaught ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-2xs">
+            <span className={pillSolid('success', 'md')}>
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Capturado</span>
+              <span>{isStarterRoute ? 'Inicial recibido' : 'Capturado'}</span>
+            </span>
+          ) : isStarterRoute ? (
+            <span className={pill('warning', 'md')}>
+              <Award className="w-3.5 h-3.5" />
+              <span>Elige tu inicial</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold border border-slate-200 dark:border-slate-700">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
+            <span className={pill('neutral', 'md')}>
+              <Clock className="w-3.5 h-3.5" />
               <span>Pendiente de Ruleta</span>
             </span>
           )}
@@ -358,16 +498,20 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
       </div>
 
       {/* Main Body */}
-      <div className="p-4 sm:p-5 space-y-4">
+      <div className={cn(pad.card, 'space-y-4')}>
         {/* CASE A: ALREADY CAUGHT */}
         {isCaught && savedEncounter && caughtMeta && caughtSprites && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-emerald-200/90 dark:border-emerald-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div
+            className={card({
+              extra: 'flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4',
+            })}
+          >
             {/* Pokemon Sprite and Data */}
             <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => openDetail('pokemon', caughtMeta.cleanName)}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center p-1.5 flex-shrink-0 shadow-2xs group cursor-pointer hover:border-indigo-500 transition-all"
+                className={spriteFrame(true, 'w-16 h-16 sm:w-20 sm:h-20 p-1.5 group')}
                 title={`Haz clic para ver estadísticas y detalles de ${caughtMeta.displayName}`}
               >
                 <img
@@ -390,37 +534,45 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                   <button
                     type="button"
                     onClick={() => openDetail('pokemon', caughtMeta.cleanName)}
-                    className="text-base sm:text-lg font-black text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer text-left transition-colors"
+                    className={cn(
+                      text.sectionTitle,
+                      'cursor-pointer text-left transition-colors hover:text-brand-accent-ink',
+                      focusRing
+                    )}
                     title={`Ver estadísticas de ${caughtMeta.displayName}`}
                   >
                     {caughtMeta.displayName}
                   </button>
                   {savedEncounter.isShiny && (
-                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-400 text-amber-950 flex items-center gap-0.5">
+                    <span className={pillSolid('warning')}>
                       <Sparkles className="w-3 h-3" /> Shiny
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                <div className={cn('flex items-center gap-2 mt-1 flex-wrap', text.muted)}>
+                  <span className="font-semibold text-brand-txt1">
                     {savedEncounter.levelRange || 'Nivel variable'}
                   </span>
-                  <span>•</span>
-                  <span>Método: {savedEncounter.method}</span>
-                  <span>•</span>
-                  <span>Clima: {WEATHER_TRANSLATIONS[savedEncounter.weather] || savedEncounter.weather}</span>
+                  {isStarterRoute ? (
+                    <>
+                      <span>•</span>
+                      <span>Entregado por el Campeón Lionel</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>•</span>
+                      <span>Método: {savedEncounter.method}</span>
+                      <span>•</span>
+                      <span>Clima: {WEATHER_TRANSLATIONS[savedEncounter.weather] || savedEncounter.weather}</span>
+                    </>
+                  )}
                 </div>
 
                 {/* Types */}
                 <div className="flex gap-1.5 mt-2">
                   {caughtMeta.types.map((type) => (
-                    <span
-                      key={type}
-                      className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                    >
-                      {type}
-                    </span>
+                    <TypeBadge key={type} type={type} />
                   ))}
                 </div>
               </div>
@@ -428,45 +580,69 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
 
             {/* Status Selector & Re-spin Actions */}
             <div className="flex flex-wrap items-center gap-2 self-end md:self-center">
-              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
-                {(['En Equipo', 'En Caja', 'Debilitado', 'Huido'] as const).map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => onUpdateStatus(savedEncounter.id, st)}
-                    className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                      savedEncounter.status === st
-                        ? st === 'Debilitado'
-                          ? 'bg-red-600 text-white shadow-2xs'
-                          : st === 'En Equipo'
-                          ? 'bg-indigo-600 text-white shadow-2xs'
-                          : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {st === 'Debilitado' && <Skull className="w-3 h-3" />}
-                    {st === 'En Equipo' && <Heart className="w-3 h-3" />}
-                    <span>{st}</span>
-                  </button>
-                ))}
+              <div className={cn(segmented.group, 'flex-wrap')}>
+                {(['En Equipo', 'En Caja', 'Debilitado', 'Huido'] as const).map((st) => {
+                  const stTone: Tone =
+                    st === 'Debilitado'
+                      ? 'danger'
+                      : st === 'En Equipo'
+                      ? 'success'
+                      : st === 'En Caja'
+                      ? 'info'
+                      : 'neutral';
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => onUpdateStatus(savedEncounter.id, st)}
+                      className={filterChip(savedEncounter.status === st, stTone)}
+                    >
+                      {st === 'Debilitado' && <Skull className="w-3 h-3" />}
+                      {st === 'En Equipo' && <Heart className="w-3 h-3" />}
+                      <span>{st}</span>
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Reroll button */}
-              <button
-                type="button"
-                onClick={handleSpinRoute}
-                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5"
-                title="Volver a girar la ruleta en esta ruta"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-indigo-500" />
-                <span className="hidden sm:inline">Repetir</span>
-              </button>
+              {isStarterRoute ? (
+                <div className={cn(segmented.group, 'flex-wrap')}>
+                  {STARTER_CHOICES.map((st) => {
+                    const meta = STARTERS_INFO[st];
+                    const isSelected = savedEncounter.cleanName.toLowerCase() === meta.species.toLowerCase();
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => handleChooseStarter(st)}
+                        className={segmented.item(isSelected)}
+                        title={`Cambiar inicial a ${meta.name}`}
+                      >
+                        {st === 'grookey' && <Leaf className="w-3.5 h-3.5" />}
+                        {st === 'scorbunny' && <Flame className="w-3.5 h-3.5" />}
+                        {st === 'sobble' && <Droplets className="w-3.5 h-3.5" />}
+                        <span>{meta.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSpinRoute}
+                  className={btn('secondary')}
+                  title="Volver a girar la ruleta en esta ruta"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Repetir</span>
+                </button>
+              )}
 
               {/* Delete button */}
               <button
                 type="button"
                 onClick={() => onDeleteEncounter(savedEncounter.id)}
-                className="p-2 rounded-xl bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-xs font-bold transition-colors"
+                className={iconBtn('soft', 'sm', 'danger')}
                 title="Eliminar este registro"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -476,13 +652,71 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
         )}
 
         {/* CASE B: NOT CAUGHT YET */}
-        {!isCaught && (
+        {!isCaught && isStarterRoute && (
+          <div className="space-y-3">
+            <p className={text.muted}>
+              Lionel te entrega tu primer Pokémon aquí. Elige tu inicial: los equipos de Paúl se ajustan a tu elección.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {STARTER_CHOICES.map((st) => {
+                const starter = STARTERS_INFO[st];
+                const isSelected = activeStarter === st;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => handleChooseStarter(st)}
+                    className={cn(
+                      card({ active: isSelected, interactive: !isSelected }),
+                      'text-left flex items-center gap-3 select-none cursor-pointer',
+                      focusRing
+                    )}
+                  >
+                    <div className={spriteFrame(false, 'w-14 h-14 p-1')}>
+                      <img
+                        src={starter.showdown}
+                        alt={starter.name}
+                        className="w-full h-full object-contain pixelated"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = starter.sprite;
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-sm text-brand-txt1">
+                          {starter.name}
+                        </span>
+                        {isSelected && (
+                          <CheckCircle2 className={cn('w-4 h-4 shrink-0', TONES.accent.ink)} />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <TypeBadge type={starter.type} />
+                        {st === 'grookey' && <Leaf className="w-3 h-3 text-pokemon-planta" />}
+                        {st === 'scorbunny' && <Flame className="w-3 h-3 text-pokemon-fuego" />}
+                        {st === 'sobble' && <Droplets className="w-3 h-3 text-pokemon-agua" />}
+                      </div>
+                      <p className={cn(text.meta, 'mt-1 line-clamp-1')}>
+                        Paúl usará a <strong>{starter.hopStarterName}</strong> ({starter.hopStarterType})
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {!isCaught && !isStarterRoute && (
           <div className="space-y-3">
             {/* Weather bar if multiple weathers */}
             {route.weathers.length > 1 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 flex items-center gap-1">
-                  <CloudSun className="w-3.5 h-3.5 text-amber-500" />
+              <div className={inset('flex items-center gap-2 overflow-x-auto scrollbar-none')}>
+                <span className={cn(text.label, 'mr-1 flex items-center gap-1 shrink-0')}>
+                  <CloudSun className={cn('w-3.5 h-3.5', TONES.warning.ink)} />
                   Clima:
                 </span>
                 {route.weathers.map((w) => (
@@ -490,11 +724,7 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                     key={w}
                     type="button"
                     onClick={() => setSelectedWeather(w)}
-                    className={`px-2.5 py-1 rounded-lg font-semibold transition-all whitespace-nowrap ${
-                      selectedWeather === w
-                        ? 'bg-amber-500 text-white shadow-2xs'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
+                    className={filterChip(selectedWeather === w, 'warning')}
                   >
                     {WEATHER_TRANSLATIONS[w] || w}
                   </button>
@@ -509,9 +739,9 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                 type="button"
                 onClick={handleSpinRoute}
                 disabled={isSpinning || availableEncounters.length === 0}
-                className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-sm shadow-sm hover:shadow-md transition-all active:scale-[0.99] flex items-center justify-center gap-2.5 disabled:opacity-50"
+                className={btn('primary', 'lg', 'accent', 'w-full sm:flex-1')}
               >
-                <Dice5 className={`w-4 h-4 ${isSpinning ? 'animate-spin' : ''}`} />
+                <Dice5 className={cn('w-4 h-4', isSpinning && 'animate-spin')} />
                 <span>
                   {isSpinning
                     ? `Eligiendo... (${candidateName || 'Girando'})`
@@ -524,9 +754,9 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                 type="button"
                 onClick={() => onOpenManualPicker(route, selectedWeather)}
                 disabled={isSpinning || availableEncounters.length === 0}
-                className="py-3 px-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-2"
+                className={btn('secondary', 'md')}
               >
-                <Hand className="w-4 h-4 text-indigo-500" />
+                <Hand className="w-4 h-4" />
                 <span>Elegir Manual</span>
               </button>
 
@@ -534,7 +764,7 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
               <button
                 type="button"
                 onClick={() => setShowTable(!showTable)}
-                className="py-3 px-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                className={btn('ghost', 'md', 'neutral')}
               >
                 <span>{showTable ? 'Ocultar' : `Ver Pokémon (${uniqueEncounters.length})`}</span>
                 {showTable ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -543,7 +773,7 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
 
             {/* Expandable Encounters Preview Table */}
             {showTable && (
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="pt-2 border-t border-brand-border">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {uniqueEncounters.map(({ enc, totalChance }) => {
                     const meta = parsePokemonName(enc.pokemon);
@@ -554,9 +784,13 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                         type="button"
                         onClick={() => openDetail('pokemon', meta.cleanName)}
                         title={`Haz clic para ver estadísticas y detalles de ${meta.displayName}`}
-                        className="bg-slate-50 dark:bg-slate-800/50 hover:bg-indigo-50 dark:hover:bg-slate-700/80 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-400 flex items-center gap-2 text-left cursor-pointer transition-all hover:scale-[1.02]"
+                        className={card({
+                          interactive: true,
+                          padding: 'none',
+                          extra: cn('p-2 flex items-center gap-2 text-left cursor-pointer', focusRing),
+                        })}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden p-0.5 flex-shrink-0">
+                        <div className={spriteFrame(false, 'w-8 h-8 p-0.5')}>
                           <img
                             src={sprites.sprite}
                             alt={meta.displayName}
@@ -566,12 +800,12 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                          <div className="text-xs font-bold text-brand-txt1 truncate">
                             {meta.cleanName}
                           </div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold flex items-center justify-between">
+                          <div className={cn(text.meta, 'font-semibold flex items-center justify-between')}>
                             <span>{enc.levelRange || route.levelDisplay}</span>
-                            <span className="text-indigo-600 dark:text-indigo-400 font-bold">{totalChance}%</span>
+                            <span className={cn('font-bold', TONES.info.ink)}>{totalChance}%</span>
                           </div>
                         </div>
                       </button>

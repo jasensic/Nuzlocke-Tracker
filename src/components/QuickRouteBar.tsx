@@ -12,6 +12,7 @@ import {
   CircleDot,
   Compass,
 } from 'lucide-react';
+import { cn, panel, btn, pill, text, field, TONES } from '../utils/ui';
 
 interface QuickRouteBarProps {
   routes: RouteData[];
@@ -68,7 +69,7 @@ export const QuickRouteBar: React.FC<QuickRouteBarProps> = ({
   return (
     <div
       id="quick-route-bar"
-      className="bg-white dark:bg-slate-900 rounded-3xl p-3.5 sm:p-4 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-3 transition-colors"
+      className={panel('space-y-3')}
     >
       {/* 1. Route Navigator Row: Previous, Quick Selector, Next */}
       <div className="flex items-center justify-between gap-2 sm:gap-3">
@@ -79,26 +80,22 @@ export const QuickRouteBar: React.FC<QuickRouteBarProps> = ({
           onClick={() => prevRoute && onRouteChange(prevRoute.id)}
           disabled={!prevRoute}
           title={prevRoute ? `Anterior: ${prevRoute.name} (${prevRoute.levelDisplay})` : 'Primera ruta'}
-          className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1 flex-shrink-0 ${
-            prevRoute
-              ? 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 active:scale-95 shadow-xs cursor-pointer'
-              : 'bg-slate-100/50 dark:bg-slate-800/30 text-slate-300 dark:text-slate-600 border-slate-100 dark:border-slate-800/50 cursor-not-allowed'
-          }`}
+          className={btn('secondary', 'md', 'accent', 'shrink-0')}
         >
           <ChevronLeft className="w-4 h-4" />
           <span className="hidden sm:inline">Anterior</span>
         </button>
 
         {/* Quick Route Dropdown */}
-        <div className="relative flex-1 min-w-0">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1 text-red-500">
-            <MapPin className="w-4 h-4 flex-shrink-0" />
+        <div className={cn(field.withIcon, 'min-w-0')}>
+          <div className={cn('absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1', TONES.accent.ink)}>
+            <MapPin className="w-4 h-4 shrink-0" />
           </div>
           <select
             id="quick-route-select"
             value={selectedRouteId}
             onChange={(e) => onRouteChange(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm font-extrabold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all truncate cursor-pointer"
+            className={cn(field.select, field.iconInputPad, 'truncate')}
           >
             {routes.map((r, i) => {
               const encs =
@@ -124,11 +121,7 @@ export const QuickRouteBar: React.FC<QuickRouteBarProps> = ({
           onClick={() => nextRoute && onRouteChange(nextRoute.id)}
           disabled={!nextRoute}
           title={nextRoute ? `Siguiente: ${nextRoute.name} (${nextRoute.levelDisplay})` : 'Última ruta'}
-          className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1 flex-shrink-0 ${
-            nextRoute
-              ? 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 active:scale-95 shadow-xs cursor-pointer'
-              : 'bg-slate-100/50 dark:bg-slate-800/30 text-slate-300 dark:text-slate-600 border-slate-100 dark:border-slate-800/50 cursor-not-allowed'
-          }`}
+          className={btn('secondary', 'md', 'accent', 'shrink-0')}
         >
           <span className="hidden sm:inline">Siguiente</span>
           <ChevronRight className="w-4 h-4" />
@@ -136,24 +129,24 @@ export const QuickRouteBar: React.FC<QuickRouteBarProps> = ({
       </div>
 
       {/* 2. UNIFIED ROUTE INFO: The ONLY place showing all route metadata */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-brand-border">
         {/* Route Details: Name, Level, Category & Index */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 font-black text-sm text-slate-900 dark:text-white">
-            <Compass className="w-4 h-4 text-red-500 flex-shrink-0" />
+          <div className={cn(text.subtitle, 'flex items-center gap-1.5')}>
+            <Compass className={cn('w-4 h-4 shrink-0', TONES.accent.ink)} />
             <span>{currentRoute?.name}</span>
           </div>
 
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-black text-xs bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-            <Flame className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+          <span className={pill('warning', 'sm', 'tabular-nums')}>
+            <Flame className="w-3 h-3" />
             {currentRoute?.levelDisplay}
           </span>
 
-          <span className="px-2 py-0.5 rounded-full font-semibold text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+          <span className={pill('neutral', 'sm')}>
             {currentRoute?.category}
           </span>
 
-          <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+          <span className={cn(text.meta, 'font-bold tabular-nums')}>
             (Ruta {currentIndex + 1} de {routes.length})
           </span>
         </div>
@@ -161,7 +154,7 @@ export const QuickRouteBar: React.FC<QuickRouteBarProps> = ({
         {/* Nuzlocke Route Status Tag (visible on both mobile and desktop) */}
         <div className="flex items-center">
           {isCaught && caughtPokemon ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 font-bold text-xs shadow-2xs">
+            <div className={pill('success', 'md')}>
               <img
                 src={getPokemonSprite(caughtPokemon.pokemon).sprite}
                 alt={caughtPokemon.pokemon}
@@ -170,7 +163,7 @@ export const QuickRouteBar: React.FC<QuickRouteBarProps> = ({
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               <span>
                 Ya capturado:{' '}
                 <strong>
@@ -179,8 +172,8 @@ export const QuickRouteBar: React.FC<QuickRouteBarProps> = ({
               </span>
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-800 font-bold text-xs shadow-2xs">
-              <CircleDot className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 flex-shrink-0" />
+            <div className={pill('info', 'md')}>
+              <CircleDot className="w-3.5 h-3.5 shrink-0" />
               <span>🟢 1º Encuentro Disponible</span>
             </div>
           )}

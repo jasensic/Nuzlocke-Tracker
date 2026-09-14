@@ -7,12 +7,31 @@ import { usePokeDetail } from '../context/PokeDetailContext';
 import { Sparkles, BookmarkCheck, Check, ShieldAlert, Heart, Box, Wind, Compass, Hand, Info } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sfx } from '../utils/audio';
+import { TypeBadge } from './TypeBadge';
+import {
+  cn,
+  panelLg,
+  inset,
+  btn,
+  pill,
+  pillSolid,
+  statTile,
+  text,
+  field,
+  layout,
+  filterChip,
+  spriteFrame,
+  TONES,
+  type Tone,
+} from '../utils/ui';
 
 interface EncounterResultCardProps {
   encounter: RouteEncounter;
   routeName: string;
   routeId: string;
   onSave: (saved: SavedEncounter) => void;
+  onUpdate?: (id: string, updates: Partial<SavedEncounter>) => void;
+  existingSavedId?: string;
   isAlreadySaved?: boolean;
   selectionMode?: 'random' | 'manual';
 }
@@ -22,6 +41,8 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
   routeName,
   routeId,
   onSave,
+  onUpdate,
+  existingSavedId,
   isAlreadySaved = false,
   selectionMode = 'random',
 }) => {
@@ -31,20 +52,22 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
 
   const [status, setStatus] = useState<SavedEncounter['status']>('Capturado');
   const [nickname, setNickname] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(existingSavedId ? 'Elegido a dedo' : '');
   const [isShiny, setIsShiny] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(isAlreadySaved);
+  const [savedSuccess, setSavedSuccess] = useState(isAlreadySaved || Boolean(existingSavedId));
+  const [savedId, setSavedId] = useState<string | null>(existingSavedId ?? null);
   const [imgSrc, setImgSrc] = useState(showdown);
 
   // Synchronize internal state whenever the encounter or route changes
   useEffect(() => {
     setImgSrc(showdown);
-    setSavedSuccess(isAlreadySaved);
+    setSavedSuccess(isAlreadySaved || Boolean(existingSavedId));
+    setSavedId(existingSavedId ?? null);
     setNickname('');
-    setNotes('');
+    setNotes(existingSavedId ? 'Elegido a dedo' : '');
     setIsShiny(false);
     setStatus('Capturado');
-  }, [encounter.pokemon, encounter.method, encounter.weather, encounter.levelRange, routeId, isAlreadySaved, showdown]);
+  }, [encounter.pokemon, encounter.method, encounter.weather, encounter.levelRange, routeId, isAlreadySaved, existingSavedId, showdown]);
 
   // Update image when shiny mode is toggled
   useEffect(() => {
@@ -74,16 +97,31 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
   const primaryType = types[0] || 'Normal';
   const typeStyle = TYPE_COLORS[primaryType] || TYPE_COLORS['Normal'];
 
-  const getRarity = (chance: number) => {
-    if (chance <= 2) return { label: 'Extremadamente Raro', color: 'bg-amber-500/20 text-amber-700 border-amber-300' };
-    if (chance <= 5) return { label: 'Muy Raro', color: 'bg-purple-500/20 text-purple-700 border-purple-300' };
-    if (chance <= 15) return { label: 'Poco Común', color: 'bg-blue-500/20 text-blue-700 border-blue-300' };
-    return { label: 'Común', color: 'bg-emerald-500/20 text-emerald-700 border-emerald-300' };
+  const getRarity = (chance: number): { label: string; tone: Tone } => {
+    if (chance <= 2) return { label: 'Extremadamente Raro', tone: 'warning' };
+    if (chance <= 5) return { label: 'Muy Raro', tone: 'accent' };
+    if (chance <= 15) return { label: 'Poco Común', tone: 'info' };
+    return { label: 'Común', tone: 'success' };
   };
 
   const rarity = getRarity(encounter.chance);
 
   const handleSave = () => {
+    const nicknameValue = nickname.trim() || undefined;
+    const notesValue = notes.trim() || undefined;
+
+    if (savedId && onUpdate) {
+      onUpdate(savedId, {
+        status,
+        nickname: nicknameValue,
+        notes: notesValue,
+        isShiny,
+      });
+      setSavedSuccess(true);
+      sfx.playCatch();
+      return;
+    }
+
     const item: SavedEncounter = {
       id: `${routeId}-${encounter.pokemon}-${Date.now()}`,
       timestamp: Date.now(),
@@ -97,12 +135,13 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
       levelRange: encounter.levelRange,
       chance: encounter.chance,
       status,
-      nickname: nickname.trim() || undefined,
-      notes: notes.trim() || undefined,
+      nickname: nicknameValue,
+      notes: notesValue,
       isShiny,
     };
 
     onSave(item);
+    setSavedId(item.id);
     setSavedSuccess(true);
     sfx.playCatch();
 
@@ -120,44 +159,44 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
       initial={{ opacity: 0, y: 20, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.4 }}
-      className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xl overflow-hidden transition-colors"
+      className={panelLg('w-full max-w-xl overflow-hidden')}
     >
       {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
-        <div className="flex items-center space-x-2">
-          <Compass className="w-5 h-5 text-amber-400" />
-          <span className="font-semibold text-sm tracking-wide text-slate-200 uppercase">
+      <div className={inset('flex flex-wrap items-center justify-between gap-2')}>
+        <div className="flex items-center gap-2">
+          <Compass className={cn('w-5 h-5', TONES.warning.ink)} />
+          <span className={text.labelStrong}>
             {routeName}
           </span>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           {selectionMode === 'manual' && (
-            <span className="px-2.5 py-0.5 text-xs font-black rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/50 flex items-center gap-1 shadow-xs">
-              <Hand className="w-3 h-3 text-amber-300" />
+            <span className={pill('warning', 'sm')}>
+              <Hand className="w-3 h-3" />
               Elegido a Dedo
             </span>
           )}
-          <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${rarity.color} bg-white/10 text-white border-white/20`}>
+          <span className={pill(rarity.tone, 'sm')}>
             {encounter.chance}% ({rarity.label})
           </span>
           {isShiny && (
-            <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-400 text-amber-950 flex items-center gap-1 shadow-sm">
-              <Sparkles className="w-3 h-3 fill-amber-950" />
+            <span className={pillSolid('warning', 'sm')}>
+              <Sparkles className="w-3 h-3 fill-current" />
               SHINY
             </span>
           )}
         </div>
       </div>
 
-      <div className="p-6 md:p-8">
+      <div className="mt-5">
         {/* Main Presentation: Pokemon Visual & Details */}
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           {/* Pokemon Sprite / Avatar Stage */}
-          <div className="relative group flex-shrink-0">
-            <div className="w-36 h-36 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center p-3 shadow-inner relative overflow-hidden">
+          <div className="relative group shrink-0">
+            <div className={spriteFrame(false, 'w-36 h-36 p-3 relative')}>
               {/* Radial subtle glow based on type */}
               <div
-                className="absolute inset-0 opacity-15 rounded-2xl"
+                className="absolute inset-0 opacity-15 rounded-xl"
                 style={{
                   background: `radial-gradient(circle, var(--tw-gradient-stops))`,
                 }}
@@ -176,11 +215,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
               id="toggle-shiny-button"
               type="button"
               onClick={() => setIsShiny(!isShiny)}
-              className={`mt-2 w-full py-1 px-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1 transition-all ${
-                isShiny
-                  ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 font-semibold'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+              className={filterChip(isShiny, 'warning', 'mt-2 w-full justify-center')}
             >
               <Sparkles className="w-3.5 h-3.5" />
               {isShiny ? '¡Es Variocolor!' : 'Marcar Shiny'}
@@ -190,32 +225,24 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
           {/* Core Info Details */}
           <div className="flex-1 text-center sm:text-left space-y-2.5">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5">
-              {types.map((t) => {
-                const style = TYPE_COLORS[t] || TYPE_COLORS['Normal'];
-                return (
-                  <span
-                    key={t}
-                    className={`px-3 py-0.5 text-xs font-bold rounded-full ${style.badge}`}
-                  >
-                    {t}
-                  </span>
-                );
-              })}
+              {types.map((t) => (
+                <TypeBadge key={t} type={t} />
+              ))}
               {formLabel && (
-                <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                <span className={pill('neutral', 'sm')}>
                   Forma {formLabel}
                 </span>
               )}
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              <h2 className={text.pageTitle}>
                 {displayName}
               </h2>
               <button
                 type="button"
                 onClick={() => openDetail('pokemon', cleanName)}
-                className="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors flex items-center gap-1 cursor-pointer"
+                className={btn('soft', 'xs', 'info')}
                 title={`Ver estadísticas base, habilidades y datos de ${displayName}`}
               >
                 <Info className="w-3.5 h-3.5" />
@@ -224,11 +251,11 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
             </div>
 
             {/* Badges for Weather, Method & Levels */}
-            <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
-                <span className="text-slate-500 dark:text-slate-400 block font-medium">Método</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className={statTile('neutral')}>
+                <span className={cn(text.label, 'block')}>Método</span>
+                <span className={cn(text.subtitle, 'flex items-center gap-1.5 mt-0.5')}>
+                  <span className={cn('w-2 h-2 rounded-full shrink-0', TONES.success.fill)} />
                   <span className="truncate">
                     {encounter.methods && encounter.methods.length > 1
                       ? encounter.methods
@@ -257,18 +284,18 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
                 </span>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
-                <span className="text-slate-500 dark:text-slate-400 block font-medium">Clima Requerido</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mt-0.5">
-                  <Wind className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+              <div className={statTile('neutral')}>
+                <span className={cn(text.label, 'block')}>Clima Requerido</span>
+                <span className={cn(text.subtitle, 'flex items-center gap-1.5 mt-0.5')}>
+                  <Wind className={cn('w-3.5 h-3.5 shrink-0', TONES.info.ink)} />
                   <span className="truncate">{translateWeather(encounter.weather)}</span>
                 </span>
               </div>
 
               {encounter.levelRange && (
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 col-span-2">
-                  <span className="text-slate-500 dark:text-slate-400 block font-medium">Rango de Nivel</span>
-                  <span className="font-black text-slate-900 dark:text-slate-100">{encounter.levelRange}</span>
+                <div className={statTile('neutral', 'col-span-2')}>
+                  <span className={cn(text.label, 'block')}>Rango de Nivel</span>
+                  <span className={cn(text.subtitle, 'mt-0.5 block')}>{encounter.levelRange}</span>
                 </div>
               )}
             </div>
@@ -276,11 +303,11 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
         </div>
 
         {/* Section: Logging & Saving info */}
-        <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 space-y-4">
-          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+        <div className={cn('mt-6 pt-5 space-y-4', layout.divider)}>
+          <div className={cn(text.subtitle, 'flex flex-wrap items-center justify-between gap-2')}>
             <span>Guardar en tu Bitácora</span>
             {savedSuccess && (
-              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+              <span className={pill('success', 'sm')}>
                 <Check className="w-3.5 h-3.5" /> Registrado en Historial
               </span>
             )}
@@ -289,7 +316,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Nickname Input */}
             <div>
-              <label htmlFor="pokemon-nickname-input" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+              <label htmlFor="pokemon-nickname-input" className={field.label}>
                 Mote / Apodo (Opcional)
               </label>
               <input
@@ -298,20 +325,20 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
                 placeholder="Ej. Chispa, Rocky..."
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
+                className={field.input}
               />
             </div>
 
             {/* Status Select */}
             <div>
-              <label htmlFor="pokemon-status-select" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+              <label htmlFor="pokemon-status-select" className={field.label}>
                 Estado del Encuentro
               </label>
               <select
                 id="pokemon-status-select"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as SavedEncounter['status'])}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all font-medium cursor-pointer"
+                className={field.select}
               >
                 <option value="Capturado">🎯 Capturado</option>
                 <option value="En Equipo">⭐ En Equipo</option>
@@ -323,7 +350,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
 
             {/* Notes Input */}
             <div className="sm:col-span-2">
-              <label htmlFor="pokemon-notes-input" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+              <label htmlFor="pokemon-notes-input" className={field.label}>
                 Notas adicionales (Regla Nuzlocke, Naturaleza, Habilidad)
               </label>
               <input
@@ -332,7 +359,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
                 placeholder="Ej. Primer encuentro de ruta según reglas Nuzlocke."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
+                className={field.input}
               />
             </div>
           </div>
@@ -342,11 +369,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
             id="save-encounter-button"
             type="button"
             onClick={handleSave}
-            className={`w-full py-3 px-6 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all ${
-              savedSuccess
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
-                : 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-red-600/25 active:scale-[0.98]'
-            }`}
+            className={btn('primary', 'lg', savedSuccess ? 'success' : 'accent', 'w-full')}
           >
             {savedSuccess ? (
               <>

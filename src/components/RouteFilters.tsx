@@ -22,6 +22,18 @@ import {
   Eye,
   Search,
 } from 'lucide-react';
+import {
+  cn,
+  panel,
+  iconBtn,
+  pill,
+  iconTile,
+  text,
+  segmented,
+  filterChip,
+  anim,
+  TONES,
+} from '../utils/ui';
 
 interface RouteFiltersProps {
   currentRoute: RouteData;
@@ -158,33 +170,33 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
   return (
     <div
       id="route-filters-carousel-panel"
-      className="w-full bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-5 transition-all animate-fadeIn"
+      className={panel(cn('w-full space-y-5', anim.fadeInUp))}
     >
       {/* Header with Title and Close Button */}
-      <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+      <div className="flex items-center justify-between gap-2 pb-3 border-b border-brand-border">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-black">
+          <div className={iconTile('accent')}>
             <SlidersHorizontal className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+            <h3 className={text.cardTitle}>
               Carrusel de Filtros y Condiciones
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className={text.meta}>
               Personaliza el clima y tipo de encuentro para la ruleta
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 font-extrabold text-xs border border-red-200 dark:border-red-900">
+          <span className={pill('accent', 'md', 'shrink-0 tabular-nums')}>
             {availableCount} Disponibles
           </span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar filtros"
-            className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            className={iconBtn('ghost', 'sm', 'neutral')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -193,16 +205,16 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
 
       {/* 1. CARRUSEL DE CLIMAS */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+        <div className={cn('flex items-center justify-between gap-2', text.labelStrong)}>
           <span className="flex items-center gap-1.5">
-            <Wind className="w-3.5 h-3.5 text-blue-500" />
+            <Wind className={cn('w-3.5 h-3.5', TONES.info.ink)} />
             Carrusel de Climas en {currentRoute?.name}:
           </span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => scrollWeather('left')}
-              className="p-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+              className={iconBtn('soft', 'sm', 'neutral')}
               title="Desplazar a la izquierda"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -210,7 +222,7 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
             <button
               type="button"
               onClick={() => scrollWeather('right')}
-              className="p-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+              className={iconBtn('soft', 'sm', 'neutral')}
               title="Desplazar a la derecha"
             >
               <ChevronRight className="w-3.5 h-3.5" />
@@ -234,34 +246,32 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
                 key={weatherKey}
                 type="button"
                 onClick={() => onWeatherChange(weatherKey)}
-                className={`flex-shrink-0 min-w-[130px] p-3 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2 select-none ${
-                  isSelected
-                    ? 'border-blue-500 bg-blue-50/90 dark:bg-blue-950/60 shadow-xs ring-1 ring-blue-500/20 text-blue-950 dark:text-blue-100'
-                    : 'border-slate-200 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
+                className={filterChip(
+                  isSelected,
+                  'accent',
+                  'flex-col shrink-0 min-w-[130px] text-left select-none'
+                )}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between w-full">
                   <div
-                    className={`w-7 h-7 rounded-xl flex items-center justify-center ${
-                      isSelected
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
+                    className={cn(
+                      'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+                      isSelected ? 'bg-brand-card/20' : 'bg-brand-card border border-brand-border'
+                    )}
                   >
                     <WeatherIcon className="w-4 h-4" />
                   </div>
                   <span
-                    className={`text-[10px] font-black px-1.5 py-0.5 rounded-lg ${
-                      isSelected
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-                    }`}
+                    className={cn(
+                      'text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums',
+                      isSelected ? 'bg-brand-card/20' : 'bg-brand-card border border-brand-border'
+                    )}
                   >
                     {count}
                   </span>
                 </div>
-                <div>
-                  <div className="font-black text-xs truncate">{weatherLabel}</div>
+                <div className="w-full">
+                  <div className="font-bold text-xs truncate">{weatherLabel}</div>
                   <div className="text-[10px] opacity-70 font-medium">
                     {isSelected ? '✓ Seleccionado' : 'Tocar para activar'}
                   </div>
@@ -273,11 +283,11 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
       </div>
 
       {/* 2. CARRUSEL DE MÉTODOS Y MODO DE PROBABILIDAD */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2 border-t border-brand-border">
         {/* Método Carousel / Pills */}
         <div className="lg:col-span-2 space-y-2">
-          <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-emerald-500" />
+          <label className={cn(text.labelStrong, 'flex items-center gap-1.5')}>
+            <Filter className={cn('w-3.5 h-3.5', TONES.success.ink)} />
             Método de Aparición:
           </label>
           <div className="flex flex-wrap gap-2">
@@ -302,19 +312,14 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
                   key={methodKey}
                   type="button"
                   onClick={() => onMethodChange(methodKey)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
+                  className={filterChip(isSelected)}
                 >
                   <span>{label}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                      isSelected
-                        ? 'bg-emerald-700 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
+                    className={cn(
+                      'text-[10px] px-1.5 py-0.5 rounded-md tabular-nums',
+                      isSelected ? 'bg-brand-card/20' : 'bg-brand-card border border-brand-border'
+                    )}
                   >
                     {count}
                   </span>
@@ -326,20 +331,16 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
 
         {/* Modo de Probabilidad */}
         <div className="space-y-2">
-          <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <Dice5 className="w-3.5 h-3.5 text-purple-500" />
+          <span className={cn(text.labelStrong, 'flex items-center gap-1.5')}>
+            <Dice5 className={cn('w-3.5 h-3.5', TONES.info.ink)} />
             Ponderación de Probabilidad:
           </span>
-          <div className="flex rounded-xl p-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+          <div className={cn(segmented.group, 'flex w-full')}>
             <button
               id="mode-weighted-button"
               type="button"
               onClick={() => onToggleWeighted(true)}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all ${
-                isWeighted
-                  ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs border border-purple-200 dark:border-purple-800'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
+              className={segmented.item(isWeighted, 'flex-1')}
               title="Usa las probabilidades exactas del juego oficial"
             >
               % Real Oficial
@@ -348,11 +349,7 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
               id="mode-uniform-button"
               type="button"
               onClick={() => onToggleWeighted(false)}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all ${
-                !isWeighted
-                  ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs border border-purple-200 dark:border-purple-800'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
+              className={segmented.item(!isWeighted, 'flex-1')}
               title="Misma probabilidad exacta para todos los Pokémon disponibles"
             >
               Equitativo (1/N)
@@ -362,17 +359,17 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
       </div>
 
       {/* 3. CARRUSEL DE RUTAS POR NIVEL (Progreso Nuzlocke) */}
-      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+      <div className="pt-3 border-t border-brand-border space-y-2">
+        <div className={cn('flex items-center justify-between gap-2', text.labelStrong)}>
           <span className="flex items-center gap-1.5">
-            <ArrowUpDown className="w-3.5 h-3.5 text-indigo-500" />
+            <ArrowUpDown className={cn('w-3.5 h-3.5', TONES.info.ink)} />
             Cambio Rápido de Ruta por Nivel (#1 a #{routes.length}):
           </span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => scrollRoutes('left')}
-              className="p-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+              className={iconBtn('soft', 'sm', 'neutral')}
               title="Rutas anteriores"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -380,7 +377,7 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
             <button
               type="button"
               onClick={() => scrollRoutes('right')}
-              className="p-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+              className={iconBtn('soft', 'sm', 'neutral')}
               title="Rutas siguientes"
             >
               <ChevronRight className="w-3.5 h-3.5" />
@@ -402,38 +399,30 @@ export const RouteFilters: React.FC<RouteFiltersProps> = ({
                 key={r.id}
                 type="button"
                 onClick={() => onRouteChange(r.id)}
-                className={`flex-shrink-0 min-w-[130px] p-2.5 rounded-2xl text-left border transition-all flex flex-col gap-1 select-none ${
-                  isSelected
-                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/90 dark:bg-indigo-950/60 shadow-xs ring-1 ring-indigo-500/20'
-                    : isRouteCaught
-                    ? 'border-emerald-200 dark:border-emerald-800/70 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
-                    : 'border-slate-200 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
+                className={filterChip(
+                  isSelected,
+                  'accent',
+                  'flex-col shrink-0 min-w-[130px] text-left select-none'
+                )}
               >
-                <div className="flex items-center justify-between gap-1">
-                  <span className="font-black text-[10px] text-slate-400">#{idx + 1}</span>
-                  <span
-                    className={`text-[10px] font-black px-1.5 py-0.2 rounded-md ${
-                      isRouteCaught
-                        ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300'
-                        : 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300'
-                    }`}
-                  >
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <span className="font-bold text-[10px] opacity-60 tabular-nums">#{idx + 1}</span>
+                  <span className={pill(isRouteCaught ? 'success' : 'warning', 'xs', 'tabular-nums')}>
                     {r.levelDisplay}
                   </span>
                 </div>
-                <div className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
+                <div className="font-bold text-xs truncate w-full">
                   {r.name}
                 </div>
-                <div className="flex items-center gap-1 text-[10px]">
+                <div className="flex items-center gap-1 text-[10px] w-full">
                   {isRouteCaught ? (
-                    <span className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-0.5 truncate">
-                      <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                    <span className="font-bold flex items-center gap-0.5 truncate">
+                      <CheckCircle2 className={cn('w-3 h-3 shrink-0', !isSelected && TONES.success.ink)} />
                       {encs[0].cleanName || encs[0].pokemon}
                     </span>
                   ) : (
-                    <span className="text-sky-600 dark:text-sky-400 font-semibold flex items-center gap-0.5">
-                      <CircleDot className="w-3 h-3 flex-shrink-0" />
+                    <span className="font-semibold flex items-center gap-0.5">
+                      <CircleDot className={cn('w-3 h-3 shrink-0', !isSelected && TONES.info.ink)} />
                       Disponible
                     </span>
                   )}

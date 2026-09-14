@@ -28,6 +28,25 @@ import {
   Trophy,
   Zap,
 } from 'lucide-react';
+import { TypeBadge } from './TypeBadge';
+import {
+  cn,
+  panel,
+  panelLg,
+  card,
+  btn,
+  iconBtn,
+  pill,
+  text,
+  field,
+  layout,
+  segmented,
+  filterChip,
+  spriteFrame,
+  emptyState,
+  focusRing,
+  TONES,
+} from '../utils/ui';
 
 const STARTER_STORAGE_KEY = 'pokemon_starter_choice_v1';
 
@@ -170,21 +189,21 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
   };
 
   return (
-    <div id="trainer-guide-view" className="space-y-6">
+    <div id="trainer-guide-view" className={layout.view}>
       {/* Top Banner / Hero */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm transition-colors">
+      <div className={panelLg()}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-                <Swords className="w-6 h-6 text-red-500" />
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <h2 className={cn(text.pageTitle, 'flex items-center gap-2.5')}>
+                <Swords className={cn('w-6 h-6', TONES.accent.ink)} />
                 Guía de Combates de Entrenadores
               </h2>
-              <span className="px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/70 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs font-black">
+              <span className={pill('accent', 'sm')}>
                 Mod Blessed Shield
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-2xl">
+            <p className="text-xs sm:text-sm text-brand-txt2 max-w-2xl">
               Equipos completos, niveles, objetos con sprites, habilidades y movimientos con colores por tipo en español para preparar tus combates y planificar tu Nuzlocke.
             </p>
           </div>
@@ -193,9 +212,9 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
             <button
               type="button"
               onClick={onOpenTenantModal}
-              className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-colors flex items-center gap-1.5"
+              className={btn('secondary', 'md')}
             >
-              <Gamepad2 className="w-4 h-4 text-indigo-500" />
+              <Gamepad2 className={cn('w-4 h-4', TONES.info.ink)} />
               <span>Juego: {activeTenant.shortName}</span>
             </button>
           </div>
@@ -203,9 +222,15 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
 
         {/* Notice if not on Blessed Shield */}
         {!isBlessedShield && (
-          <div className="mt-4 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-800/80 text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div
+            className={card({
+              tone: 'warning',
+              padding: 'compact',
+              extra: 'mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs',
+            })}
+          >
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <AlertCircle className={cn('w-4 h-4 shrink-0', TONES.warning.ink)} />
               <span>
                 Actualmente tienes seleccionado <strong>{activeTenant.name}</strong>. Esta guía de entrenadores contiene los datos específicos del mod <strong>Pokémon Blessed Shield</strong>.
               </span>
@@ -214,7 +239,7 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
               <button
                 type="button"
                 onClick={onSelectBlessedShieldTenant}
-                className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition-colors text-xs flex-shrink-0 self-start sm:self-auto"
+                className={btn('solid', 'sm', 'warning', 'shrink-0 self-start sm:self-auto')}
               >
                 Cambiar a Blessed Shield
               </button>
@@ -224,18 +249,18 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
       </div>
 
       {/* 1. STARTER SELECTION (Mandatory first choice) */}
-      <section className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-3">
+      <section className={panelLg('space-y-4')}>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center">
+            <span className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', TONES.info.solid)}>
               1
             </span>
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+            <h3 className={text.sectionTitle}>
               Elige tu Inicial de Galar (Los equipos de tu rival Paúl cambian según tu elección):
             </h3>
           </div>
-          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-            Inicial actual: <strong className="text-slate-800 dark:text-slate-200">{STARTERS_INFO[starterChoice].name}</strong>
+          <span className={cn(text.meta, 'font-semibold')}>
+            Inicial actual: <strong className="text-brand-txt1">{STARTERS_INFO[starterChoice].name}</strong>
           </span>
         </div>
 
@@ -250,14 +275,14 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
                 key={stKey}
                 type="button"
                 onClick={() => handleSelectStarter(stKey)}
-                className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3.5 select-none ${
-                  isSelected
-                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/90 dark:bg-indigo-950/60 shadow-xs ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
+                className={cn(
+                  card({ active: isSelected, interactive: !isSelected }),
+                  'text-left flex items-center gap-3 select-none cursor-pointer',
+                  focusRing
+                )}
               >
                 {/* Starter Sprite */}
-                <div className="w-14 h-14 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 flex-shrink-0 flex items-center justify-center p-1 overflow-hidden">
+                <div className={spriteFrame(false, 'w-14 h-14 p-1')}>
                   <img
                     src={starter.showdown}
                     alt={starter.name}
@@ -270,22 +295,20 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
                 {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="font-black text-sm text-slate-900 dark:text-white">
+                    <span className="font-bold text-sm text-brand-txt1">
                       {starter.name}
                     </span>
                     {isSelected && (
-                      <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                      <CheckCircle2 className={cn('w-4 h-4 shrink-0', TONES.accent.ink)} />
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-md ${starter.typeColor}`}>
-                      {starter.type}
-                    </span>
-                    {stKey === 'grookey' && <Leaf className="w-3 h-3 text-emerald-500" />}
-                    {stKey === 'scorbunny' && <Flame className="w-3 h-3 text-orange-500" />}
-                    {stKey === 'sobble' && <Droplets className="w-3 h-3 text-blue-500" />}
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <TypeBadge type={starter.type} />
+                    {stKey === 'grookey' && <Leaf className="w-3 h-3 text-pokemon-planta" />}
+                    {stKey === 'scorbunny' && <Flame className="w-3 h-3 text-pokemon-fuego" />}
+                    {stKey === 'sobble' && <Droplets className="w-3 h-3 text-pokemon-agua" />}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
+                  <p className={cn(text.meta, 'mt-1 line-clamp-1')}>
                     Paúl usará a <strong>{starter.hopStarterName}</strong> ({starter.hopStarterType})
                   </p>
                 </div>
@@ -296,16 +319,16 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
       </section>
 
       {/* 2. QUICK JUMP CAROUSEL (Combates ordenados por nivel) */}
-      <section className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-2.5">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200 flex-wrap gap-2">
+      <section className={panel('space-y-3')}>
+        <div className="flex items-center justify-between text-xs font-bold text-brand-txt1 flex-wrap gap-2">
           <span className="flex items-center gap-1.5">
-            <ArrowUpDown className="w-3.5 h-3.5 text-indigo-500" />
+            <ArrowUpDown className={cn('w-3.5 h-3.5', TONES.info.ink)} />
             Progreso por Niveles ({filteredBattles.length} combates visibles • {sortOrder === 'asc' ? 'Nv. Ascendente' : 'Nv. Descendente'}):
           </span>
           <button
             type="button"
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+            className={cn(text.link, 'text-[11px] flex items-center gap-1')}
           >
             Invertir Orden ({sortOrder === 'asc' ? 'Nv. 11 ➔ Nv. 90' : 'Nv. 90 ➔ Nv. 11'})
           </button>
@@ -320,9 +343,16 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
                 key={`pill-${b.id}`}
                 type="button"
                 onClick={() => handleScrollToBattle(b.id)}
-                className="flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 transition-all flex items-center gap-2 shadow-2xs hover:shadow-xs group text-left"
+                className={cn(
+                  card({
+                    interactive: true,
+                    padding: 'none',
+                    extra: 'shrink-0 px-3 py-2 flex items-center gap-2 text-left cursor-pointer group',
+                  }),
+                  focusRing
+                )}
               >
-                <div className="w-7 h-7 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden p-0.5">
+                <div className="w-7 h-7 rounded-lg bg-brand-surface border border-brand-border flex items-center justify-center overflow-hidden p-0.5">
                   <img
                     src={trainerMeta.avatarUrl}
                     alt={trainerMeta.spanishName}
@@ -333,12 +363,12 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
                 </div>
                 <div>
                   <div className="flex items-center gap-1">
-                    <span className="font-extrabold text-xs text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                    <span className="font-bold text-xs text-brand-txt1 group-hover:text-brand-accent-ink transition-colors">
                       {trainerMeta.spanishName}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-bold">#{b.order}</span>
+                    <span className={cn(text.meta, 'font-bold')}>#{b.order}</span>
                   </div>
-                  <div className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                  <div className={cn('text-[10px] font-semibold', TONES.info.ink)}>
                     Nv. {b.minLevel}-{b.maxLevel} • {b.location.split(' ')[0]}
                   </div>
                 </div>
@@ -351,18 +381,14 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
       {/* 3. CATEGORY TABS & FILTERS */}
       <div className="space-y-3">
         {/* Category Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 overflow-x-auto gap-1 scrollbar-none">
+        <div className={cn(segmented.group, 'max-w-full overflow-x-auto scrollbar-none')}>
           <button
             type="button"
             onClick={() => {
               setCategoryFilter('all');
               setTrainerFilter('all');
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              categoryFilter === 'all'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={segmented.item(categoryFilter === 'all')}
           >
             <Swords className="w-3.5 h-3.5" />
             <span>Todos ({BLESSED_SHIELD_TRAINER_BATTLES.length})</span>
@@ -374,13 +400,9 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
               setCategoryFilter('gym_leader');
               setTrainerFilter('all');
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              categoryFilter === 'gym_leader'
-                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={segmented.item(categoryFilter === 'gym_leader')}
           >
-            <Award className="w-3.5 h-3.5 text-amber-500" />
+            <Award className={cn('w-3.5 h-3.5', TONES.warning.ink)} />
             <span>Líderes de Gimnasio (8)</span>
           </button>
 
@@ -390,13 +412,9 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
               setCategoryFilter('rival');
               setTrainerFilter('all');
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              categoryFilter === 'rival'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={segmented.item(categoryFilter === 'rival')}
           >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+            <Sparkles className={cn('w-3.5 h-3.5', TONES.info.ink)} />
             <span>Rivales (11)</span>
           </button>
 
@@ -406,13 +424,9 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
               setCategoryFilter('champions_cup');
               setTrainerFilter('all');
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              categoryFilter === 'champions_cup'
-                ? 'bg-white dark:bg-slate-900 text-yellow-600 dark:text-yellow-400 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={segmented.item(categoryFilter === 'champions_cup')}
           >
-            <Trophy className="w-3.5 h-3.5 text-yellow-500" />
+            <Trophy className={cn('w-3.5 h-3.5', TONES.warning.ink)} />
             <span>Copa de Campeones (4)</span>
           </button>
 
@@ -422,29 +436,21 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
               setCategoryFilter('boss');
               setTrainerFilter('all');
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              categoryFilter === 'boss'
-                ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
+            className={segmented.item(categoryFilter === 'boss')}
           >
-            <Zap className="w-3.5 h-3.5 text-rose-500" />
+            <Zap className={cn('w-3.5 h-3.5', TONES.danger.ink)} />
             <span>Jefes de Historia (3)</span>
           </button>
         </div>
 
         {/* Sub-Filter Trainer Chips (if more than 1 trainer in category) */}
         {availableTrainers.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filtrar por:</span>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <span className={cn(text.label, 'mr-1 shrink-0')}>Filtrar por:</span>
             <button
               type="button"
               onClick={() => setTrainerFilter('all')}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all whitespace-nowrap ${
-                trainerFilter === 'all'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+              className={filterChip(trainerFilter === 'all')}
             >
               Todos
             </button>
@@ -453,11 +459,7 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
                 key={`trainer-chip-${t.id}`}
                 type="button"
                 onClick={() => setTrainerFilter(trainerFilter === t.id ? 'all' : t.id)}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  trainerFilter === t.id
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
+                className={filterChip(trainerFilter === t.id)}
               >
                 <span>{t.name}</span>
                 <span className="text-[10px] opacity-75 font-normal">({t.count})</span>
@@ -469,20 +471,20 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
         {/* Search Bar & Order Toggle */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
           {/* Search Bar */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <div className={field.withIcon}>
+            <Search className={field.icon} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar por Pokémon, movimiento, habilidad, objeto o gimnasio..."
-              className="w-full pl-9.5 pr-4 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
+              className={cn(field.input, field.iconInputPad, 'pr-10')}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className={iconBtn('ghost', 'sm', 'neutral', 'absolute right-1.5 top-1/2 -translate-y-1/2')}
               >
                 ✕
               </button>
@@ -493,10 +495,10 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
           <button
             type="button"
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="p-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5 shadow-2xs flex-shrink-0"
+            className={btn('secondary', 'md', 'accent', 'shrink-0')}
             title="Cambiar orden de niveles"
           >
-            <ArrowUpDown className="w-3.5 h-3.5 text-indigo-500" />
+            <ArrowUpDown className={cn('w-3.5 h-3.5', TONES.info.ink)} />
             <span>
               {sortOrder === 'asc' ? 'Nv. Ascendente' : 'Nv. Descendente'}
             </span>
@@ -505,14 +507,16 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
       </div>
 
       {/* 4. TRAINER BATTLES LIST */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         {filteredBattles.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-10 text-center border border-slate-200 dark:border-slate-800 space-y-3">
-            <Swords className="w-10 h-10 mx-auto text-slate-400" />
-            <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+          <div className={emptyState.wrapper}>
+            <div className={emptyState.bubble}>
+              <Swords className="w-6 h-6" />
+            </div>
+            <h3 className={emptyState.title}>
               No se encontraron combates
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className={emptyState.hint}>
               No hay ningún combate que coincida con el criterio de búsqueda "{searchQuery}".
             </p>
             <button
@@ -521,7 +525,7 @@ export const TrainerGuideView: React.FC<TrainerGuideViewProps> = ({
                 setSearchQuery('');
                 setTrainerFilter('all');
               }}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors"
+              className={btn('primary', 'sm')}
             >
               Restablecer filtros
             </button>

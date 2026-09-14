@@ -1,4 +1,4 @@
-import { StarterChoice } from '../../types';
+import { SavedEncounter, StarterChoice } from '../../types';
 
 // ==========================================
 // STARTERS INFO & SPRITES
@@ -54,6 +54,52 @@ export const STARTERS_INFO: Record<StarterChoice, StarterMeta> = {
     hopStarterType: 'Fuego',
   },
 };
+
+export const STARTER_CHOICES: StarterChoice[] = ['grookey', 'scorbunny', 'sobble'];
+export const STARTER_ENCOUNTER_ID = 'starter-choice-encounter';
+export const STARTER_ROUTE_ID = 'town-of-postwick';
+export const STARTER_ROUTE_NAME = 'Pueblo Yarda';
+
+export function isStarterGiftRoute(routeId: string): boolean {
+  return routeId === STARTER_ROUTE_ID;
+}
+
+export function isStarterEncounter(item: Pick<SavedEncounter, 'id' | 'routeId' | 'routeName'>): boolean {
+  return (
+    item.id === STARTER_ENCOUNTER_ID ||
+    item.routeId === STARTER_ROUTE_ID ||
+    item.routeName === STARTER_ROUTE_NAME
+  );
+}
+
+export function starterEncounterUpdates(
+  starter: StarterChoice
+): Pick<SavedEncounter, 'pokemon' | 'cleanName' | 'notes'> {
+  const meta = STARTERS_INFO[starter];
+  return {
+    pokemon: meta.name,
+    cleanName: meta.species,
+    notes: `Pokémon inicial escogido (${meta.name}, tipo ${meta.type}) entregado por Lionel en Pueblo Yarda.`,
+  };
+}
+
+export function buildStarterEncounter(starter: StarterChoice): SavedEncounter {
+  const meta = STARTERS_INFO[starter];
+  return {
+    id: STARTER_ENCOUNTER_ID,
+    timestamp: Date.now(),
+    routeId: STARTER_ROUTE_ID,
+    routeName: STARTER_ROUTE_NAME,
+    pokemon: meta.name,
+    cleanName: meta.species,
+    method: 'Otro',
+    weather: 'Todos los Climas',
+    levelRange: 'Nv. 5',
+    chance: 100,
+    status: 'En Equipo',
+    notes: starterEncounterUpdates(starter).notes,
+  };
+}
 
 // ==========================================
 // TRAINERS METADATA & AVATARS
@@ -130,6 +176,16 @@ export const TRAINERS_META: Record<string, TrainerMeta> = {
     tagColor: 'bg-orange-100 text-orange-800 dark:bg-orange-950/70 dark:text-orange-300 border-orange-200 dark:border-orange-800',
     borderHover: 'hover:border-orange-400 dark:hover:border-orange-500',
   },
+  bea: {
+    id: 'bea',
+    name: 'Bea',
+    spanishName: 'Judith',
+    title: 'Líder de Gimnasio Ladera (Lucha)',
+    avatarUrl: 'https://play.pokemonshowdown.com/sprites/trainers/bea.png',
+    themeColor: 'from-amber-500/20 to-orange-600/20',
+    tagColor: 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 border-amber-300 dark:border-amber-700',
+    borderHover: 'hover:border-amber-500 dark:hover:border-amber-400',
+  },
   allister: {
     id: 'allister',
     name: 'Allister',
@@ -149,6 +205,16 @@ export const TRAINERS_META: Record<string, TrainerMeta> = {
     themeColor: 'from-pink-500/20 to-rose-500/20',
     tagColor: 'bg-pink-100 text-pink-800 dark:bg-pink-950/70 dark:text-pink-300 border-pink-200 dark:border-pink-800',
     borderHover: 'hover:border-pink-400 dark:hover:border-pink-500',
+  },
+  gordie: {
+    id: 'gordie',
+    name: 'Gordie',
+    spanishName: 'Morris',
+    title: 'Líder de Gimnasio Auriga (Roca)',
+    avatarUrl: 'https://play.pokemonshowdown.com/sprites/trainers/gordie.png',
+    themeColor: 'from-yellow-600/20 to-stone-500/20',
+    tagColor: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-950/70 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700',
+    borderHover: 'hover:border-yellow-500 dark:hover:border-yellow-400',
   },
   melony: {
     id: 'melony',
@@ -320,12 +386,47 @@ const ABILITY_TRANSLATIONS: Record<string, string> = {
   'Screen Cleaner': 'Antibarrera',
   'Solar Power': 'Poder Solar',
   'Intrepid Sword': 'Espada Indómita',
+  'Comatose': 'Comatoso',
+  'Hydration': 'Hidratación',
+  'Rain Dish': 'Cura Lluvia',
+  'Lightning Rod': 'Pararrayos',
+  'Speed Boost': 'Impulso',
+  'White Smoke': 'Humo Blanco',
+  'Receiver': 'Receptor',
+  'Technician': 'Experto',
+  'Skill Link': 'Encadenado',
+  'Misty Surge': 'Nebulogénesis',
+  'Huge Power': 'Potencia',
+  'Cloud Nine': 'Aclimatación',
+  'Triage': 'Primer Auxilio',
+  'Power Spot': 'Fuente Energía',
+  'Steam Engine': 'Combustible',
+  'Ice Body': 'Gélido',
+  'Oblivious': 'Despiste',
+  'Snow Warning': 'Nevada',
+  'Aura Break': 'Rompeaura',
+  'Power of Alchemy': 'Reacción Química',
+  'Rock Head': 'Cabeza Roca',
+  'Multiscale': 'Compensación',
+  'Sand Force': 'Poder Arena',
 };
 
 export function translateAbility(ability: string): string {
   if (!ability) return '';
   const trimmed = ability.trim();
-  return ABILITY_TRANSLATIONS[trimmed] || trimmed;
+  if (ABILITY_TRANSLATIONS[trimmed]) return ABILITY_TRANSLATIONS[trimmed];
+
+  const titleCase = trimmed
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+
+  if (titleCase !== trimmed && ABILITY_TRANSLATIONS[titleCase]) {
+    return ABILITY_TRANSLATIONS[titleCase];
+  }
+
+  return trimmed;
 }
 
 // ==========================================
@@ -347,6 +448,7 @@ const NATURE_TRANSLATIONS: Record<string, { es: string; desc: string }> = {
   'Rash': { es: 'Alocada', desc: '+Atq.Esp, -Def.Esp' },
   'Lonely': { es: 'Huraña', desc: '+Atq, -Def' },
   'Hardy': { es: 'Fuerte', desc: 'Neutra' },
+  'Mild': { es: 'Afable', desc: '+Atq.Esp, -Def' },
 };
 
 export function translateNature(nature: string): { name: string; desc: string } {
@@ -398,6 +500,20 @@ const ITEM_DATA: Record<string, ItemData> = {
   'Air Balloon': { spanishName: 'Globo Helio', slug: 'air-balloon' },
   'Aguav Berry': { spanishName: 'Baya Guayaba', slug: 'aguav-berry' },
   'Figy Berry': { spanishName: 'Baya Higog', slug: 'figy-berry' },
+  'Damp Rock': { spanishName: 'Roca Lluvia', slug: 'damp-rock' },
+  'Salac Berry': { spanishName: 'Baya Payapa', slug: 'salac-berry' },
+  'Charti Berry': { spanishName: 'Baya Pasio', slug: 'charti-berry' },
+  'Red Card': { spanishName: 'Tarjeta Roja', slug: 'red-card' },
+  'Roseli Berry': { spanishName: 'Baya Hibis', slug: 'roseli-berry' },
+  'Coba Berry': { spanishName: 'Baya Yecana', slug: 'coba-berry' },
+  "King's Rock": { spanishName: 'Roca del Rey', slug: 'kings-rock' },
+  'Smooth Rock': { spanishName: 'Roca Suave', slug: 'smooth-rock' },
+  'Weakness Policy': { spanishName: 'Seguro Debilidad', slug: 'weakness-policy' },
+  'Rindo Berry': { spanishName: 'Baya Tamar', slug: 'rindo-berry' },
+  'Icy Rock': { spanishName: 'Roca Helada', slug: 'icy-rock' },
+  'Flame Orb': { spanishName: 'Llamasfera', slug: 'flame-orb' },
+  'Throat Spray': { spanishName: 'Espray Bucal', slug: 'throat-spray' },
+  'Safety Goggles': { spanishName: 'Gafa Protectora', slug: 'safety-goggles' },
 };
 
 export function getItemInfo(item?: string): { name: string; original: string; spriteUrl?: string } {
@@ -670,6 +786,51 @@ const MOVE_DATABASE: Record<string, { es: string; type: string }> = {
   'Outrage': { es: 'Enfado', type: 'Dragon' },
   'Iron Defense': { es: 'Defensa Férrea', type: 'Steel' },
   'Behemoth Blade': { es: 'Tajo Supremo', type: 'Steel' },
+  'U-Turn': { es: 'Ida y Vuelta', type: 'Bug' },
+  'Nature Power': { es: 'Adaptación', type: 'Normal' },
+  'Leaf Tornado': { es: 'Ciclón de Hojas', type: 'Grass' },
+  'Round': { es: 'Canon', type: 'Normal' },
+  'Bubble Beam': { es: 'Rayo Burbuja', type: 'Water' },
+  'Razor Shell': { es: 'Concha Filo', type: 'Water' },
+  'Venoshock': { es: 'Carga Tóxica', type: 'Poison' },
+  'Aqua Ring': { es: 'Acua Aro', type: 'Water' },
+  'Bounce': { es: 'Bote', type: 'Flying' },
+  'Hone Claws': { es: 'Afilagarras', type: 'Dark' },
+  'Rapid Spin': { es: 'Giro Rápido', type: 'Normal' },
+  'Bug Bite': { es: 'Picadura', type: 'Bug' },
+  'Blaze Kick': { es: 'Patada Ígnea', type: 'Fire' },
+  'Ally Switch': { es: 'Cambio de Banda', type: 'Psychic' },
+  'Discharge': { es: 'Chispazo', type: 'Electric' },
+  'Night Shade': { es: 'Tinieblas', type: 'Ghost' },
+  'Helping Hand': { es: 'Refuerzo', type: 'Normal' },
+  'Wide Guard': { es: 'Vastaguardia', type: 'Rock' },
+  'Dynamic Punch': { es: 'Puño Dinámico', type: 'Fighting' },
+  'Brutal Swing': { es: 'Giro Vil', type: 'Dark' },
+  'Toxic Spikes': { es: 'Púas Tóxicas', type: 'Poison' },
+  'Trop Kick': { es: 'Patada Tropical', type: 'Grass' },
+  'Meteor Beam': { es: 'Rayo Meteórico', type: 'Rock' },
+  'Photon Geyser': { es: 'Géiser Fotónico', type: 'Psychic' },
+  'Sunsteel Strike': { es: 'Meteoimpacto', type: 'Steel' },
+  'Sacred Fire': { es: 'Fuego Sagrado', type: 'Fire' },
+  'Hail': { es: 'Granizo', type: 'Ice' },
+  'Surf': { es: 'Surf', type: 'Water' },
+  'Blizzard': { es: 'Ventisca', type: 'Ice' },
+  'Perish Song': { es: 'Canto Mortal', type: 'Normal' },
+  'Fishious Rend': { es: 'Branquibocado', type: 'Water' },
+  'Drum Beating': { es: 'Batería Asalto', type: 'Grass' },
+  'Breaking Swipe': { es: 'Vastoimpacto', type: 'Dragon' },
+  'Thousand Arrows': { es: 'Mil Flechas', type: 'Ground' },
+  'Thousand Waves': { es: 'Mil Temblores', type: 'Ground' },
+  'Steel Beam': { es: 'Metaláser', type: 'Steel' },
+  'Dragon Hammer': { es: 'Martillo Dragón', type: 'Dragon' },
+  'Slack Off': { es: 'Relajo', type: 'Normal' },
+  'Stomping Tantrum': { es: 'Pataleta', type: 'Ground' },
+  'Sandstorm': { es: 'Tormenta Arena', type: 'Rock' },
+  'Dragon Claw': { es: 'Garra Dragón', type: 'Dragon' },
+  'Draining Kiss': { es: 'Beso Drenaje', type: 'Fairy' },
+  'Aura Sphere': { es: 'Esfera Aural', type: 'Fighting' },
+  'Extrasensory': { es: 'Paranormal', type: 'Psychic' },
+  'Bullet Punch': { es: 'Puño Bala', type: 'Steel' },
 };
 
 const TYPE_TRANSLATE: Record<string, string> = {
@@ -743,41 +904,39 @@ export function getMoveInfo(move: string): MoveInfo {
 
 // Map Pokémon Types to Tailwind Styles
 export const MOVE_TYPE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  Normal: { bg: 'bg-zinc-100 dark:bg-zinc-800/90', text: 'text-zinc-700 dark:text-zinc-300', border: 'border-zinc-300 dark:border-zinc-700' },
-  Fire: { bg: 'bg-orange-50 dark:bg-orange-950/60', text: 'text-orange-700 dark:text-orange-300', border: 'border-orange-300 dark:border-orange-800' },
-  Water: { bg: 'bg-blue-50 dark:bg-blue-950/60', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-300 dark:border-blue-800' },
-  Grass: { bg: 'bg-emerald-50 dark:bg-emerald-950/60', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-300 dark:border-emerald-800' },
-  Electric: { bg: 'bg-amber-50 dark:bg-amber-950/60', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-300 dark:border-amber-800' },
-  Ice: { bg: 'bg-cyan-50 dark:bg-cyan-950/60', text: 'text-cyan-700 dark:text-cyan-300', border: 'border-cyan-300 dark:border-cyan-800' },
-  Fighting: { bg: 'bg-red-50 dark:bg-red-950/60', text: 'text-red-700 dark:text-red-300', border: 'border-red-300 dark:border-red-800' },
-  Poison: { bg: 'bg-purple-50 dark:bg-purple-950/60', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-300 dark:border-purple-800' },
-  Ground: { bg: 'bg-amber-100/60 dark:bg-amber-950/80', text: 'text-amber-800 dark:text-amber-200', border: 'border-amber-400 dark:border-amber-700' },
-  Flying: { bg: 'bg-indigo-50 dark:bg-indigo-950/60', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-300 dark:border-indigo-800' },
-  Psychic: { bg: 'bg-pink-50 dark:bg-pink-950/60', text: 'text-pink-700 dark:text-pink-300', border: 'border-pink-300 dark:border-pink-800' },
-  Bug: { bg: 'bg-lime-50 dark:bg-lime-950/60', text: 'text-lime-700 dark:text-lime-300', border: 'border-lime-300 dark:border-lime-800' },
-  Rock: { bg: 'bg-yellow-100/90 dark:bg-yellow-950/70', text: 'text-yellow-900 dark:text-yellow-200', border: 'border-yellow-600/80 dark:border-yellow-500/60' },
-  Ghost: { bg: 'bg-violet-50 dark:bg-violet-950/60', text: 'text-violet-700 dark:text-violet-300', border: 'border-violet-300 dark:border-violet-800' },
-  Dragon: { bg: 'bg-indigo-100/60 dark:bg-indigo-950/80', text: 'text-indigo-800 dark:text-indigo-200', border: 'border-indigo-400 dark:border-indigo-700' },
-  Dark: { bg: 'bg-neutral-100 dark:bg-neutral-800/90', text: 'text-neutral-800 dark:text-neutral-200', border: 'border-neutral-400 dark:border-neutral-600' },
-  Steel: { bg: 'bg-slate-100 dark:bg-slate-800/80', text: 'text-slate-700 dark:text-slate-300', border: 'border-slate-300 dark:border-slate-600' },
-  Fairy: { bg: 'bg-rose-50 dark:bg-rose-950/60', text: 'text-rose-700 dark:text-rose-300', border: 'border-rose-300 dark:border-rose-800' },
-
-  // Spanish aliases
-  Roca: { bg: 'bg-yellow-100/90 dark:bg-yellow-950/70', text: 'text-yellow-900 dark:text-yellow-200', border: 'border-yellow-600/80 dark:border-yellow-500/60' },
-  Fuego: { bg: 'bg-orange-50 dark:bg-orange-950/60', text: 'text-orange-700 dark:text-orange-300', border: 'border-orange-300 dark:border-orange-800' },
-  Agua: { bg: 'bg-blue-50 dark:bg-blue-950/60', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-300 dark:border-blue-800' },
-  Planta: { bg: 'bg-emerald-50 dark:bg-emerald-950/60', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-300 dark:border-emerald-800' },
-  Eléctrico: { bg: 'bg-amber-50 dark:bg-amber-950/60', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-300 dark:border-amber-800' },
-  Hielo: { bg: 'bg-cyan-50 dark:bg-cyan-950/60', text: 'text-cyan-700 dark:text-cyan-300', border: 'border-cyan-300 dark:border-cyan-800' },
-  Lucha: { bg: 'bg-red-50 dark:bg-red-950/60', text: 'text-red-700 dark:text-red-300', border: 'border-red-300 dark:border-red-800' },
-  Veneno: { bg: 'bg-purple-50 dark:bg-purple-950/60', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-300 dark:border-purple-800' },
-  Tierra: { bg: 'bg-amber-100/60 dark:bg-amber-950/80', text: 'text-amber-800 dark:text-amber-200', border: 'border-amber-400 dark:border-amber-700' },
-  Volador: { bg: 'bg-indigo-50 dark:bg-indigo-950/60', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-300 dark:border-indigo-800' },
-  Psíquico: { bg: 'bg-pink-50 dark:bg-pink-950/60', text: 'text-pink-700 dark:text-pink-300', border: 'border-pink-300 dark:border-pink-800' },
-  Bicho: { bg: 'bg-lime-50 dark:bg-lime-950/60', text: 'text-lime-700 dark:text-lime-300', border: 'border-lime-300 dark:border-lime-800' },
-  Fantasma: { bg: 'bg-violet-50 dark:bg-violet-950/60', text: 'text-violet-700 dark:text-violet-300', border: 'border-violet-300 dark:border-violet-800' },
-  Dragón: { bg: 'bg-indigo-100/60 dark:bg-indigo-950/80', text: 'text-indigo-800 dark:text-indigo-200', border: 'border-indigo-400 dark:border-indigo-700' },
-  Siniestro: { bg: 'bg-neutral-100 dark:bg-neutral-800/90', text: 'text-neutral-800 dark:text-neutral-200', border: 'border-neutral-400 dark:border-neutral-600' },
-  Acero: { bg: 'bg-slate-100 dark:bg-slate-800/80', text: 'text-slate-700 dark:text-slate-300', border: 'border-slate-300 dark:border-slate-600' },
-  Hada: { bg: 'bg-rose-50 dark:bg-rose-950/60', text: 'text-rose-700 dark:text-rose-300', border: 'border-rose-300 dark:border-rose-800' },
+  Normal: { bg: 'bg-pokemon-normal', text: 'text-white', border: 'border-pokemon-normal' },
+  Fire: { bg: 'bg-pokemon-fuego', text: 'text-white', border: 'border-pokemon-fuego' },
+  Water: { bg: 'bg-pokemon-agua', text: 'text-white', border: 'border-pokemon-agua' },
+  Grass: { bg: 'bg-pokemon-planta', text: 'text-white', border: 'border-pokemon-planta' },
+  Electric: { bg: 'bg-pokemon-electrico', text: 'text-gray-900', border: 'border-pokemon-electrico' },
+  Ice: { bg: 'bg-pokemon-hielo', text: 'text-gray-900', border: 'border-pokemon-hielo' },
+  Fighting: { bg: 'bg-pokemon-lucha', text: 'text-white', border: 'border-pokemon-lucha' },
+  Poison: { bg: 'bg-pokemon-veneno', text: 'text-white', border: 'border-pokemon-veneno' },
+  Ground: { bg: 'bg-pokemon-tierra', text: 'text-gray-900', border: 'border-pokemon-tierra' },
+  Flying: { bg: 'bg-pokemon-volador', text: 'text-white', border: 'border-pokemon-volador' },
+  Psychic: { bg: 'bg-pokemon-psiquico', text: 'text-white', border: 'border-pokemon-psiquico' },
+  Bug: { bg: 'bg-pokemon-bicho', text: 'text-white', border: 'border-pokemon-bicho' },
+  Rock: { bg: 'bg-pokemon-roca', text: 'text-white', border: 'border-pokemon-roca' },
+  Ghost: { bg: 'bg-pokemon-fantasma', text: 'text-white', border: 'border-pokemon-fantasma' },
+  Dragon: { bg: 'bg-pokemon-dragon', text: 'text-white', border: 'border-pokemon-dragon' },
+  Dark: { bg: 'bg-pokemon-siniestro', text: 'text-white', border: 'border-pokemon-siniestro' },
+  Steel: { bg: 'bg-pokemon-acero', text: 'text-gray-900', border: 'border-pokemon-acero' },
+  Fairy: { bg: 'bg-pokemon-hada', text: 'text-white', border: 'border-pokemon-hada' },
+  Roca: { bg: 'bg-pokemon-roca', text: 'text-white', border: 'border-pokemon-roca' },
+  Fuego: { bg: 'bg-pokemon-fuego', text: 'text-white', border: 'border-pokemon-fuego' },
+  Agua: { bg: 'bg-pokemon-agua', text: 'text-white', border: 'border-pokemon-agua' },
+  Planta: { bg: 'bg-pokemon-planta', text: 'text-white', border: 'border-pokemon-planta' },
+  Eléctrico: { bg: 'bg-pokemon-electrico', text: 'text-gray-900', border: 'border-pokemon-electrico' },
+  Hielo: { bg: 'bg-pokemon-hielo', text: 'text-gray-900', border: 'border-pokemon-hielo' },
+  Lucha: { bg: 'bg-pokemon-lucha', text: 'text-white', border: 'border-pokemon-lucha' },
+  Veneno: { bg: 'bg-pokemon-veneno', text: 'text-white', border: 'border-pokemon-veneno' },
+  Tierra: { bg: 'bg-pokemon-tierra', text: 'text-gray-900', border: 'border-pokemon-tierra' },
+  Volador: { bg: 'bg-pokemon-volador', text: 'text-white', border: 'border-pokemon-volador' },
+  Psíquico: { bg: 'bg-pokemon-psiquico', text: 'text-white', border: 'border-pokemon-psiquico' },
+  Bicho: { bg: 'bg-pokemon-bicho', text: 'text-white', border: 'border-pokemon-bicho' },
+  Fantasma: { bg: 'bg-pokemon-fantasma', text: 'text-white', border: 'border-pokemon-fantasma' },
+  Dragón: { bg: 'bg-pokemon-dragon', text: 'text-white', border: 'border-pokemon-dragon' },
+  Siniestro: { bg: 'bg-pokemon-siniestro', text: 'text-white', border: 'border-pokemon-siniestro' },
+  Acero: { bg: 'bg-pokemon-acero', text: 'text-gray-900', border: 'border-pokemon-acero' },
+  Hada: { bg: 'bg-pokemon-hada', text: 'text-white', border: 'border-pokemon-hada' },
 };

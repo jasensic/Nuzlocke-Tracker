@@ -19,7 +19,7 @@ export const PokeballSpinner: React.FC<PokeballSpinnerProps> = ({ isSpinning, si
           id="pokeball-glow"
           animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0.9, 0.4] }}
           transition={{ duration: 0.6, repeat: Infinity }}
-          className="absolute inset-0 rounded-full bg-red-400 blur-xl -z-10"
+          className="absolute inset-0 rounded-full bg-brand-accent/70 blur-xl -z-10"
         />
       )}
 

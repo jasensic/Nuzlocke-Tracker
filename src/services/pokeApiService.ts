@@ -84,6 +84,18 @@ export interface PokemonStat {
   percent: number;
 }
 
+export type LearnMethod = 'level-up' | 'machine' | 'egg' | 'tutor' | 'other';
+
+export interface PokemonLearnMove {
+  slug: string;
+  name: string;
+  nameEs: string;
+  type: string;
+  level: number;
+  method: LearnMethod;
+  methodEs: string;
+}
+
 export interface PokemonDetail {
   id: number;
   slug: string;
@@ -101,6 +113,7 @@ export interface PokemonDetail {
   abilities: Array<{ name: string; nameEs: string; isHidden: boolean; slug: string }>;
   stats: PokemonStat[];
   bst: number;
+  learnset: PokemonLearnMove[];
 }
 
 // Translations mapping
@@ -133,6 +146,57 @@ export const STAT_TRANSLATIONS: Record<string, string> = {
   'special-defense': 'Def. Esp.',
   speed: 'Velocidad',
 };
+
+const LEARN_METHOD_ES: Record<LearnMethod, string> = {
+  'level-up': 'Nivel',
+  machine: 'MT / MO',
+  egg: 'Huevo',
+  tutor: 'Tutor',
+  other: 'Otro',
+};
+
+const PREFERRED_VERSION_GROUPS = [
+  'sword-shield',
+  'the-isle-of-armor',
+  'the-crown-tundra',
+  'brilliant-diamond-shining-pearl',
+  'scarlet-violet',
+  'the-teal-mask',
+  'the-indigo-disk',
+];
+
+function slugToEnglishMoveName(slug: string): string {
+  return slug
+    .split('-')
+    .map((word) => (word.length ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(' ');
+}
+
+async function resolveAbilityNameEs(abilitySlug: string): Promise<string> {
+  const englishName = slugToEnglishMoveName(abilitySlug);
+  const localSpanish = translateAbility(englishName);
+  if (localSpanish !== englishName) return localSpanish;
+
+  try {
+    const ability = await pokemonClient.getAbilityByName(abilitySlug);
+    const esName = ability.names?.find((n) => n.language.name === 'es')?.name;
+    if (esName) return esName;
+
+    const enName =
+      ability.names?.find((n) => n.language.name === 'en')?.name || englishName;
+    const fromEn = translateAbility(enName);
+    return fromEn !== enName ? fromEn : enName;
+  } catch {
+    return englishName;
+  }
+}
+
+function toLearnMethod(raw: string): LearnMethod {
+  if (raw === 'level-up' || raw === 'machine' || raw === 'egg' || raw === 'tutor') {
+    return raw;
+  }
+  return 'other';
+}
 
 // Helper to clean slug for PokeAPI
 export function toPokeApiSlug(name: string): string {
@@ -186,6 +250,18 @@ const POKEMON_SLUG_OVERRIDES: Record<string, string> = {
   'basculin': 'basculin-red-striped',
   'gourgeist': 'gourgeist-average',
   'pumpkaboo': 'pumpkaboo-average',
+  'toxtricity-low-key': 'toxtricity-low-key',
+  'toxtricity-lowkey': 'toxtricity-low-key',
+  'zygarde-10': 'zygarde-10',
+  'cherrim-overcast': 'cherrim-overcast',
+  'centiskorch-g': 'centiskorch-gmax',
+  'machamp-gmax': 'machamp-gmax',
+  'gengar-gmax': 'gengar-gmax',
+  'alcremie-gmax': 'alcremie-gmax',
+  'coalossal-gmax': 'coalossal-gmax',
+  'lapras-gmax': 'lapras-gmax',
+  'duraludon-gmax': 'duraludon-gmax',
+  'centiskorch-gmax': 'centiskorch-gmax',
 };
 
 // ==========================================
@@ -279,7 +355,7 @@ export async function getMoveDetails(moveNameOrSlug: string): Promise<MoveDetail
 export async function getAbilityDetails(abilityNameOrSlug: string): Promise<AbilityDetail> {
   const normalized = toPokeApiSlug(abilityNameOrSlug);
 
-  const localSpanish = translateAbility(abilityNameOrSlug);
+  const localSpanish = translateAbility(slugToEnglishMoveName(normalized));
 
   try {
     const ability = await pokemonClient.getAbilityByName(normalized);
@@ -424,15 +500,17 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       };
     });
 
-    const abilities = pokemon.abilities.map((a) => {
-      const abilitySlug = a.ability.name;
-      return {
-        name: a.ability.name,
-        slug: abilitySlug,
-        nameEs: translateAbility(abilitySlug),
-        isHidden: a.is_hidden,
-      };
-    });
+    const abilities = await Promise.all(
+      pokemon.abilities.map(async (a) => {
+        const abilitySlug = a.ability.name;
+        return {
+          name: abilitySlug,
+          slug: abilitySlug,
+          nameEs: await resolveAbilityNameEs(abilitySlug),
+          isHidden: a.is_hidden,
+        };
+      })
+    );
 
     let bst = 0;
     const stats: PokemonStat[] = pokemon.stats.map((s) => {
@@ -460,6 +538,55 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       pokemon.sprites?.front_shiny ||
       artwork;
 
+    const learnset: PokemonLearnMove[] = [];
+    const seenLearnKeys = new Set<string>();
+
+    for (const entry of pokemon.moves || []) {
+      const moveSlug = entry.move?.name;
+      if (!moveSlug) continue;
+
+      const details = entry.version_group_details || [];
+      let selected = [] as typeof details;
+      for (const group of PREFERRED_VERSION_GROUPS) {
+        const match = details.filter((d) => d.version_group?.name === group);
+        if (match.length) {
+          selected = match;
+          break;
+        }
+      }
+      if (!selected.length) {
+        selected = details;
+      }
+
+      for (const detail of selected) {
+        const method = toLearnMethod(detail.move_learn_method?.name || 'other');
+        const key = `${moveSlug}:${method}:${detail.level_learned_at ?? 0}`;
+        if (seenLearnKeys.has(key)) continue;
+        seenLearnKeys.add(key);
+
+        const englishName = slugToEnglishMoveName(moveSlug);
+        const localInfo = getMoveInfo(englishName);
+
+        learnset.push({
+          slug: moveSlug,
+          name: localInfo.originalName || englishName,
+          nameEs: localInfo.spanishName || englishName,
+          type: localInfo.type || 'Normal',
+          level: detail.level_learned_at ?? 0,
+          method,
+          methodEs: LEARN_METHOD_ES[method],
+        });
+      }
+    }
+
+    learnset.sort((a, b) => {
+      const methodOrder: LearnMethod[] = ['level-up', 'machine', 'egg', 'tutor', 'other'];
+      const methodDiff = methodOrder.indexOf(a.method) - methodOrder.indexOf(b.method);
+      if (methodDiff !== 0) return methodDiff;
+      if (a.method === 'level-up') return a.level - b.level || a.nameEs.localeCompare(b.nameEs, 'es');
+      return a.nameEs.localeCompare(b.nameEs, 'es');
+    });
+
     const result: PokemonDetail = {
       id: pokemon.id,
       slug: normalized,
@@ -477,6 +604,7 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       abilities,
       stats,
       bst,
+      learnset,
     };
 
     return result;
@@ -499,6 +627,7 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       abilities: [],
       stats: [],
       bst: 0,
+      learnset: [],
     };
     return result;
   }

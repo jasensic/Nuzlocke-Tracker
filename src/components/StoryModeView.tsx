@@ -13,9 +13,10 @@ import {
   StoryChapter,
 } from '../data/storyTimeline';
 import { BLESSED_SHIELD_TRAINER_BATTLES } from '../data/trainers/blessedShieldTrainers';
-import { STARTERS_INFO } from '../data/trainers/trainerTranslations';
+import { isStarterGiftRoute } from '../data/trainers/trainerTranslations';
 import { StoryRouteCard } from './StoryRouteCard';
 import { TrainerBattleCard } from './TrainerBattleCard';
+import { TimelineMilestone, TimelineRail } from './TimelineMilestone';
 import {
   Compass,
   Search,
@@ -45,12 +46,119 @@ import {
   MapPin,
   ArrowRight,
 } from 'lucide-react';
+import {
+  cn,
+  panel,
+  panelLg,
+  card,
+  inset,
+  btn,
+  iconBtn,
+  pill,
+  pillSolid,
+  iconTile,
+  text,
+  field,
+  layout,
+  segmented,
+  filterChip,
+  emptyState,
+  TONES,
+} from '../utils/ui';
 
 const DEFEATED_STORAGE_KEY = 'pokemon_defeated_trainers_v1';
 const STARTER_STORAGE_KEY = 'pokemon_starter_choice_v1';
 const COLLAPSED_CHAPTERS_KEY = 'pokemon_collapsed_chapters_v1';
 const VIEW_SCOPE_KEY = 'pokemon_story_view_scope_v1';
 const COMPACT_MODE_KEY = 'pokemon_story_compact_mode_v1';
+
+/** Maps vertical mouse-wheel movement to eased horizontal scrolling on overflow strips. */
+function bindHorizontalWheelScroll(el: HTMLDivElement | null) {
+  if (!el) return undefined;
+
+  const easing = 0.16;
+  // Windows DPI scaling (e.g. 175%) can leave a 1–2px leftover that clips the first pill.
+  const snapThreshold = 3;
+  let targetLeft = el.scrollLeft;
+  let rafId = 0;
+
+  const maxScrollLeft = () => Math.max(0, el.scrollWidth - el.clientWidth);
+
+  const settle = (left: number) => {
+    el.scrollLeft = left;
+    targetLeft = left;
+    rafId = 0;
+  };
+
+  const animate = () => {
+    const max = maxScrollLeft();
+    const clampedTarget = Math.max(0, Math.min(max, targetLeft));
+    targetLeft = clampedTarget;
+    const current = el.scrollLeft;
+    const distance = clampedTarget - current;
+
+    if (Math.abs(distance) <= snapThreshold) {
+      settle(clampedTarget);
+      return;
+    }
+
+    el.scrollLeft = current + distance * easing;
+    // Subpixel rounding can keep scrollLeft unchanged; snap instead of looping forever.
+    if (el.scrollLeft === current) {
+      settle(clampedTarget);
+      return;
+    }
+
+    rafId = requestAnimationFrame(animate);
+  };
+
+  const onWheel = (event: WheelEvent) => {
+    if (el.scrollWidth <= el.clientWidth) return;
+
+    const primarilyVertical = Math.abs(event.deltaY) >= Math.abs(event.deltaX);
+    if (!primarilyVertical) return;
+
+    if (!rafId) targetLeft = el.scrollLeft;
+
+    const max = maxScrollLeft();
+    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+    const nextTarget = Math.max(0, Math.min(max, targetLeft + delta));
+
+    const atStart = nextTarget <= 0 && el.scrollLeft <= snapThreshold;
+    const atEnd = nextTarget >= max && el.scrollLeft >= max - snapThreshold;
+    if (atStart) {
+      if (el.scrollLeft !== 0) {
+        event.preventDefault();
+        settle(0);
+      }
+      return;
+    }
+    if (atEnd) {
+      if (el.scrollLeft !== max) {
+        event.preventDefault();
+        settle(max);
+      }
+      return;
+    }
+
+    event.preventDefault();
+    targetLeft = nextTarget;
+    if (!rafId) rafId = requestAnimationFrame(animate);
+  };
+
+  const onScroll = () => {
+    if (!rafId) targetLeft = el.scrollLeft;
+  };
+
+  el.style.scrollBehavior = 'auto';
+  el.addEventListener('wheel', onWheel, { passive: false });
+  el.addEventListener('scroll', onScroll, { passive: true });
+  return () => {
+    el.removeEventListener('wheel', onWheel);
+    el.removeEventListener('scroll', onScroll);
+    if (rafId) cancelAnimationFrame(rafId);
+  };
+}
 
 interface StoryModeViewProps {
   activeTenant: GameTenant;
@@ -438,329 +546,172 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
     }, 60);
   };
 
+  const isNextStarterGift =
+    nextActiveItem?.type === 'capture' &&
+    !!nextActiveItem.routeData &&
+    isStarterGiftRoute(nextActiveItem.routeData.id);
+
   // If user is actively typing a search query, temporarily view all chapters
   const effectiveViewScope = searchQuery.trim().length > 0 ? 'all' : viewScope;
 
   return (
-    <div className="space-y-4">
-      {/* 1. COMPACT UNIFIED CONTROL HEADER */}
-      <section className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-4">
-        {/* Top Row: Title, Game Tenant & Compact Starter Selector */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white shadow-2xs">
-                Modo Historia
-              </span>
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                {activeTenant.name}
-              </span>
+    <div className={layout.view}>
+      {nextActiveItem ? (
+        <section className={panelLg('relative overflow-hidden')}>
+          <div className="absolute -right-10 -top-10 w-44 h-44 bg-brand-accent/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-4">
+              <div className={iconTile('accent', 'w-12 h-12 shrink-0')}>
+                <Target className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className={pillSolid('accent', 'xs')}>
+                    Próximo Hito
+                  </span>
+                  <span className={cn(text.muted, 'flex items-center gap-1')}>
+                    <MapPin className={cn('w-3 h-3', TONES.accent.ink)} />
+                    {nextActiveItem.chapter.title.split(':')[0]} · {activeTenant.region}
+                  </span>
+                </div>
+                <h1 className={text.pageTitle}>
+                  {nextActiveItem.location}
+                  {nextActiveItem.type === 'capture' && (
+                    <span className={pill('info', 'sm', 'ml-2 align-middle')}>
+                      {isNextStarterGift ? 'Inicial de Lionel' : 'Ruleta disponible'}
+                    </span>
+                  )}
+                </h1>
+                <p className={cn(text.muted, 'sm:text-sm mt-0.5')}>
+                  {nextActiveItem.subtitle}
+                </p>
+              </div>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Cronología de la Aventura
-            </h1>
-          </div>
-
-          {/* Compact Starter Selector */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 self-start md:self-center">
-            <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 px-2 hidden sm:inline">
-              Inicial:
-            </span>
-            {(['grookey', 'scorbunny', 'sobble'] as StarterChoice[]).map((st) => {
-              const isSel = starterChoice === st;
-              const meta = STARTERS_INFO[st];
-              const activeClass =
-                st === 'grookey'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : st === 'scorbunny'
-                  ? 'bg-orange-600 text-white shadow-2xs'
-                  : 'bg-blue-600 text-white shadow-2xs';
-
-              return (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => handleSelectStarter(st)}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    isSel
-                      ? activeClass
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700/70'
-                  }`}
-                  title={`Inicial: ${meta.name} (Paúl llevará a ${meta.hopStarterName})`}
-                >
-                  {st === 'grookey' && <Leaf className="w-3.5 h-3.5" />}
-                  {st === 'scorbunny' && <Flame className="w-3.5 h-3.5" />}
-                  {st === 'sobble' && <Droplets className="w-3.5 h-3.5" />}
-                  <span>{meta.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Middle Row: Progress bar & Quick Stats */}
-        <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
-            <div className="flex items-center gap-3 font-bold text-slate-700 dark:text-slate-300 flex-wrap">
-              <span className="text-indigo-600 dark:text-indigo-400 font-black text-sm">
-                {progressStats.percentage}% Completado
-              </span>
-              <span className="text-slate-300 dark:text-slate-700">•</span>
-              <span className="flex items-center gap-1">
-                <Dice5 className="w-3.5 h-3.5 text-emerald-500" />
-                {progressStats.completedCaptures} / {progressStats.totalCaptures} Rutas
-              </span>
-              <span className="text-slate-300 dark:text-slate-700">•</span>
-              <span className="flex items-center gap-1">
-                <Swords className="w-3.5 h-3.5 text-red-500" />
-                {progressStats.completedBattles} / {progressStats.totalBattles} Combates
-              </span>
-            </div>
-
-            {/* Jump to active milestone button */}
-            {nextActiveItem && (
+            <div className="w-full md:w-auto flex items-center gap-3">
               <button
                 type="button"
                 onClick={handleJumpToNextActive}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all self-start sm:self-center"
+                className={btn('primary', 'lg', 'accent', 'w-full md:w-auto')}
               >
-                <Target className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-                <span>Ir al Próximo Desafío</span>
+                {isNextStarterGift ? (
+                  <Award className="w-4 h-4" />
+                ) : nextActiveItem.type === 'capture' ? (
+                  <Dice5 className="w-4 h-4" />
+                ) : (
+                  <Swords className="w-4 h-4" />
+                )}
+                <span>
+                  {isNextStarterGift
+                    ? 'Elegir Inicial'
+                    : nextActiveItem.type === 'capture'
+                      ? 'Girar Ruleta Ahora'
+                      : 'Ver Combate'}
+                </span>
               </button>
-            )}
-          </div>
-
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-emerald-500 via-indigo-500 to-amber-500 h-full transition-all duration-500 ease-out"
-              style={{ width: `${progressStats.percentage}%` }}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* 2. SPOTLIGHT: NEXT RECOMMENDED MILESTONE CARD */}
-      {nextActiveItem ? (
-        <section className="bg-gradient-to-r from-indigo-500/10 via-amber-500/5 to-rose-500/10 dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 rounded-3xl p-3.5 sm:p-4 border border-indigo-200 dark:border-indigo-900/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-2xs flex-shrink-0">
-              {nextActiveItem.type === 'capture' ? (
-                <Dice5 className="w-5 h-5" />
-              ) : (
-                <Swords className="w-5 h-5" />
-              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-600 text-white">
-                  Próximo Hito
-                </span>
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                  {nextActiveItem.chapter.title.split(':')[0]}
-                </span>
-              </div>
-              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mt-0.5">
-                {nextActiveItem.title}
-              </h3>
-              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
-                {nextActiveItem.type === 'capture'
-                  ? `Captura pendiente en ${nextActiveItem.location} (${nextActiveItem.minLevel ? `Nv. ${nextActiveItem.minLevel}-${nextActiveItem.maxLevel}` : 'Nivel variable'})`
-                  : `Combate pendiente contra ${nextActiveItem.battleData?.trainerName} en ${nextActiveItem.location}`}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
-            <button
-              type="button"
-              onClick={handleJumpToNextActive}
-              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all"
-            >
-              <span>Ver Hito</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
         </section>
       ) : (
-        <section className="bg-emerald-50/60 dark:bg-emerald-950/20 rounded-3xl p-4 border border-emerald-200 dark:border-emerald-800/80 text-center space-y-1">
-          <div className="text-emerald-800 dark:text-emerald-300 font-black text-sm flex items-center justify-center gap-1.5">
-            <Trophy className="w-4 h-4 text-amber-500" />
-            <span>¡Enhorabuena! Has completado todos los hitos y combates de la aventura</span>
+        <section className={card({ tone: 'success', extra: 'text-center' })}>
+          <div className="text-sm font-bold flex items-center justify-center gap-1.5">
+            <Trophy className="w-4 h-4" />
+            <span>¡Enhorabuena! Has completado todos los hitos de la aventura</span>
           </div>
         </section>
       )}
 
-      {/* 3. TOOLBAR: VIEW MODES, DENSITY TOGGLE, SEARCH & FILTERS */}
-      <section className="space-y-3">
-        {/* Row A: View Mode Selector (Por Capítulos vs Toda la Región) & Density Toggle */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          {/* View Scope Tabs */}
-          <div className="flex bg-slate-100 dark:bg-slate-800/90 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold self-start">
-            <button
-              type="button"
-              onClick={() => handleSetViewScope('chapter')}
-              className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                effectiveViewScope === 'chapter'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Por Etapas (Recomendado)</span>
+      <section className={panel('flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3')}>
+        <div className={field.withIcon}>
+          <Search className={field.icon} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar por ruta, especie, tipo o rival..."
+            className={cn(field.input, field.iconInputPad, 'pr-10')}
+          />
+          {searchQuery && (
+            <button type="button" onClick={() => setSearchQuery('')} className={iconBtn('ghost', 'sm', 'neutral', 'absolute right-1.5 top-1/2 -translate-y-1/2 text-xs')}>
+              ✕
             </button>
-
-            <button
-              type="button"
-              onClick={() => handleSetViewScope('all')}
-              className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                effectiveViewScope === 'all'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Toda la Región</span>
-            </button>
-          </div>
-
-          {/* Right: Density Toggle & Expand/Collapse when in 'all' */}
-          <div className="flex items-center gap-2 self-end sm:self-center">
-            {/* Compact vs Detailed view toggle */}
-            <button
-              type="button"
-              onClick={handleToggleCompact}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs ${
-                isCompact
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800'
-                  : 'bg-white text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-              }`}
-              title="Alternar entre modo compacto y detallado para reducir o ampliar la información"
-            >
-              <LayoutList className="w-3.5 h-3.5" />
-              <span>{isCompact ? 'Vista Compacta Activa' : 'Vista Detallada'}</span>
-            </button>
-
-            {effectiveViewScope === 'all' && (
-              <div className="flex items-center gap-1 text-xs font-bold text-slate-500">
-                <button
-                  type="button"
-                  onClick={handleCollapseAllChapters}
-                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all flex items-center gap-1 shadow-2xs"
-                  title="Plegar todas las etapas"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Plegar</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExpandAllChapters}
-                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all flex items-center gap-1 shadow-2xs"
-                  title="Desplegar todas las etapas"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Desplegar</span>
-                </button>
-              </div>
-            )}
-          </div>
+          )}
         </div>
-
-        {/* Row B: Search Input & Filter Chips */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
-          {/* Search Bar */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar Pokémon, ruta, líder o rival..."
-              className="w-full pl-9.5 pr-8 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Filter Pills */}
-          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold overflow-x-auto gap-1 scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-nowrap">
+          {(
+            [
+              { id: 'all', label: `Todos (${fullTimeline.length})` },
+              { id: 'pending', label: `Pendientes (${progressStats.totalItems - progressStats.completedCount})`, dot: 'bg-status-pending' },
+              { id: 'capture', label: `Rutas (${progressStats.totalCaptures})`, icon: 'map' },
+              { id: 'battle', label: `Combates (${progressStats.totalBattles})`, icon: 'swords' },
+              { id: 'completed', label: `Completados (${progressStats.completedCount})`, dot: 'bg-status-live' },
+            ] as const
+          ).map((f) => (
             <button
+              key={f.id}
               type="button"
-              onClick={() => setFilterType('all')}
-              className={`px-2.5 py-1 rounded-xl transition-all whitespace-nowrap ${
-                filterType === 'all'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              onClick={() => setFilterType(f.id)}
+              className={filterChip(filterType === f.id)}
             >
-              Todos ({fullTimeline.length})
+              {'dot' in f && f.dot ? <span className={cn('w-2 h-2 rounded-full', f.dot)} /> : null}
+              {f.id === 'battle' ? <Swords className="w-3 h-3" /> : null}
+              {f.id === 'capture' ? <MapPin className="w-3 h-3" /> : null}
+              {f.label}
             </button>
-            <button
-              type="button"
-              onClick={() => setFilterType('pending')}
-              className={`px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 whitespace-nowrap ${
-                filterType === 'pending'
-                  ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Clock className="w-3 h-3 text-amber-500" />
-              <span>Pendientes</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType('capture')}
-              className={`px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 whitespace-nowrap ${
-                filterType === 'capture'
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Dice5 className="w-3 h-3 text-emerald-500" />
-              <span>Rutas</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType('battle')}
-              className={`px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 whitespace-nowrap ${
-                filterType === 'battle'
-                  ? 'bg-white dark:bg-slate-900 text-red-600 dark:text-red-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Swords className="w-3 h-3 text-red-500" />
-              <span>Combates</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType('completed')}
-              className={`px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 whitespace-nowrap ${
-                filterType === 'completed'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <CheckCircle2 className="w-3 h-3 text-indigo-500" />
-              <span>Completados</span>
-            </button>
-          </div>
+          ))}
         </div>
       </section>
+
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className={cn(segmented.group, 'self-start')}>
+          <button
+            type="button"
+            onClick={() => handleSetViewScope('chapter')}
+            className={segmented.item(effectiveViewScope === 'chapter')}
+          >
+            <Compass className="w-3.5 h-3.5" />
+            Por Etapas
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSetViewScope('all')}
+            className={segmented.item(effectiveViewScope === 'all')}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Toda la Región
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleToggleCompact}
+            className={filterChip(isCompact)}
+          >
+            <LayoutList className="w-3.5 h-3.5" />
+            {isCompact ? 'Vista Compacta' : 'Vista Detallada'}
+          </button>
+          {effectiveViewScope === 'all' && (
+            <>
+              <button type="button" onClick={handleCollapseAllChapters} className={btn('secondary', 'sm')}>
+                Plegar
+              </button>
+              <button type="button" onClick={handleExpandAllChapters} className={btn('secondary', 'sm')}>
+                Desplegar
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* 4. MAIN CONTENT AREA */}
       {effectiveViewScope === 'chapter' ? (
         /* ================= MODE A: SINGLE CHAPTER FOCUSED VIEW ================= */
         <div className="space-y-4">
           {/* Chapter Selector & Navigation Strip */}
-          <section className="bg-white dark:bg-slate-900 rounded-3xl p-3 sm:p-4 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-3">
-            {/* Quick Carousel of all Chapters */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scroll-smooth">
+          <section className={panel('space-y-3')}>
+            <div
+              ref={bindHorizontalWheelScroll}
+              className={cn(segmented.group, 'w-full overflow-x-auto pb-1 scrollbar-none overscroll-x-contain')}
+            >
               {chaptersList.map((ch) => {
                 const isSelected = ch.id === effectiveChapterId;
                 return (
@@ -768,18 +719,16 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                     key={`chapter-pill-${ch.id}`}
                     type="button"
                     onClick={() => setSelectedChapterId(ch.id)}
-                    className={`flex-shrink-0 px-3 py-2 rounded-2xl border transition-all flex items-center gap-2 text-left shadow-2xs cursor-pointer ${
-                      isSelected
-                        ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-950 dark:text-white'
-                        : ch.isCompleted
-                        ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60 text-slate-700 dark:text-slate-300'
-                        : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-white'
-                    }`}
+                    className={segmented.item(
+                      isSelected,
+                      cn('shrink-0 gap-2 text-left', !isSelected && ch.isCompleted && TONES.success.ink)
+                    )}
                   >
                     <div
-                      className={`w-6 h-6 rounded-lg ${
-                        ch.isCompleted ? 'bg-emerald-600' : ch.badgeColor || 'bg-slate-700'
-                      } text-white flex items-center justify-center text-[10px] font-black`}
+                      className={cn(
+                        'w-6 h-6 rounded-lg text-white flex items-center justify-center text-[10px] font-bold',
+                        ch.isCompleted ? TONES.success.fill : ch.badgeColor || TONES.neutral.fill
+                      )}
                     >
                       {ch.isCompleted ? <Check className="w-3.5 h-3.5" /> : `#${ch.order}`}
                     </div>
@@ -787,7 +736,7 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                       <div className="text-xs font-bold whitespace-nowrap">
                         {ch.badgeName || ch.title.split(':')[0]}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-medium">
+                      <div className={text.meta}>
                         {ch.completedCount}/{ch.totalCount}
                       </div>
                     </div>
@@ -797,39 +746,40 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
             </div>
 
             {/* Current Chapter Card Header with Prev/Next Controls */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="pt-2 border-t border-brand-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-10 h-10 rounded-2xl ${
-                    currentChapterData.chapter.badgeColor || 'bg-slate-700'
-                  } text-white flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0`}
+                  className={cn(
+                    'w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0',
+                    currentChapterData.chapter.badgeColor || TONES.neutral.fill
+                  )}
                 >
                   #{currentChapterData.chapter.order}
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    <h2 className={text.sectionTitle}>
                       {currentChapterData.chapter.title}
                     </h2>
                     {currentChapterData.chapter.isCompleted ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center gap-1">
+                      <span className={pill('success', 'xs')}>
                         <CheckCircle2 className="w-3 h-3" />
                         <span>Completada</span>
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      <span className={pill('info', 'xs')}>
                         {currentChapterData.chapter.completedCount} / {currentChapterData.chapter.totalCount} completados
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className={cn(text.muted, 'mt-0.5')}>
                     {currentChapterData.chapter.subtitle}
                   </p>
                 </div>
               </div>
 
               {/* Prev / Next Buttons */}
-              <div className="flex items-center gap-1.5 self-end sm:self-center flex-shrink-0">
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                 <button
                   type="button"
                   disabled={!currentChapterData.prevChapter}
@@ -838,7 +788,7 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                       setSelectedChapterId(currentChapterData.prevChapter.id);
                     }
                   }}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none shadow-2xs"
+                  className={btn('secondary', 'sm')}
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Etapa Anterior</span>
@@ -852,7 +802,7 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                       setSelectedChapterId(currentChapterData.nextChapter.id);
                     }
                   }}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none shadow-2xs"
+                  className={btn('secondary', 'sm')}
                 >
                   <span className="hidden sm:inline">Siguiente Etapa</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -863,21 +813,31 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
 
           {/* Cards for this chapter (Clean 3 to 6 items only!) */}
           {currentChapterData.items.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-800 space-y-2">
-              <Compass className="w-8 h-8 mx-auto text-slate-400" />
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+            <div className={emptyState.wrapper}>
+              <Compass className="w-8 h-8 mx-auto text-brand-txt2" />
+              <p className={cn(emptyState.hint, 'font-bold')}>
                 No hay eventos que coincidan con el filtro actual en esta etapa.
               </p>
               <button
                 type="button"
                 onClick={() => setFilterType('all')}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500"
+                className={btn('primary', 'sm')}
               >
                 Ver todos los eventos
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <span className={cn('w-2 h-2 rounded-full', TONES.accent.fill)} />
+                <h2 className={text.label}>
+                  Línea Temporal · {currentChapterData.chapter.title.split(':')[0]}
+                </h2>
+              </div>
+              <span className={text.muted}>{currentChapterData.items.length} Hitos mostrados</span>
+            </div>
+            <TimelineRail>
               {currentChapterData.items.map((item) => {
                 if (item.type === 'capture' && item.routeData) {
                   const saved = history.find(
@@ -885,41 +845,59 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                       h.routeId === item.routeData!.id ||
                       h.routeName.toLowerCase() === item.routeData!.name.toLowerCase()
                   );
+                  const isNext = nextActiveItem?.id === item.id;
                   return (
-                    <StoryRouteCard
+                    <TimelineMilestone
                       key={item.id}
-                      route={item.routeData}
                       stepNumber={item.stepNumber}
-                      chapterTitle={currentChapterData.chapter.title}
-                      savedEncounter={saved}
-                      isWeighted={isWeighted}
-                      soundEnabled={soundEnabled}
-                      onSaveEncounter={onSaveEncounter}
-                      onUpdateStatus={onUpdateStatus}
-                      onDeleteEncounter={onDeleteEncounter}
-                      onOpenManualPicker={onOpenManualPicker}
-                      compact={isCompact}
-                    />
+                      isComplete={Boolean(saved)}
+                      isNext={isNext}
+                    >
+                      <StoryRouteCard
+                        route={item.routeData}
+                        stepNumber={item.stepNumber}
+                        chapterTitle={currentChapterData.chapter.title}
+                        savedEncounter={saved}
+                        isWeighted={isWeighted}
+                        soundEnabled={soundEnabled}
+                        onSaveEncounter={onSaveEncounter}
+                        onUpdateStatus={onUpdateStatus}
+                        onDeleteEncounter={onDeleteEncounter}
+                        onOpenManualPicker={onOpenManualPicker}
+                        starterChoice={starterChoice}
+                        onSelectStarter={handleSelectStarter}
+                        compact={isCompact}
+                        hideStepBadge
+                      />
+                    </TimelineMilestone>
                   );
                 }
 
                 if (item.type === 'battle' && item.battleData) {
                   const isDefeated = defeatedBattles.has(item.battleData.id);
                   return (
-                    <TrainerBattleCard
+                    <TimelineMilestone
                       key={item.id}
-                      battle={item.battleData}
-                      starterChoice={starterChoice}
-                      index={item.battleData.order - 1}
-                      isDefeated={isDefeated}
-                      onToggleDefeated={handleToggleDefeated}
-                      compact={isCompact}
-                    />
+                      stepNumber={item.stepNumber}
+                      isBattle
+                      isComplete={isDefeated}
+                      isNext={nextActiveItem?.id === item.id}
+                    >
+                      <TrainerBattleCard
+                        battle={item.battleData}
+                        starterChoice={starterChoice}
+                        index={item.battleData.order - 1}
+                        isDefeated={isDefeated}
+                        onToggleDefeated={handleToggleDefeated}
+                        compact={isCompact}
+                      />
+                    </TimelineMilestone>
                   );
                 }
 
                 return null;
               })}
+            </TimelineRail>
             </div>
           )}
         </div>
@@ -927,12 +905,12 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
         /* ================= MODE B: FULL REGION TIMELINE ================= */
         <div className="space-y-5">
           {chaptersMap.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-10 text-center border border-slate-200 dark:border-slate-800 space-y-3">
-              <Compass className="w-10 h-10 mx-auto text-slate-400" />
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+            <div className={emptyState.wrapper}>
+              <Compass className="w-10 h-10 mx-auto text-brand-txt2" />
+              <h3 className={emptyState.title}>
                 No hay eventos que coincidan
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className={emptyState.hint}>
                 No se encontraron capturas o combates para el filtro seleccionado.
               </p>
               <button
@@ -941,7 +919,7 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                   setSearchQuery('');
                   setFilterType('all');
                 }}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 transition-colors"
+                className={btn('primary', 'md')}
               >
                 Restablecer Filtros
               </button>
@@ -973,56 +951,57 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                   {/* Collapsible Chapter Header Banner */}
                   <div
                     onClick={() => handleToggleChapter(chapter.id)}
-                    className={`p-3.5 sm:p-4 rounded-3xl border transition-all cursor-pointer select-none flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs ${
-                      isFullyCompleted
-                        ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200/80 dark:border-emerald-800/60 hover:border-emerald-300'
-                        : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                    }`}
+                    className={card({
+                      interactive: true,
+                      tone: isFullyCompleted ? 'success' : undefined,
+                      extra: 'cursor-pointer select-none flex flex-col sm:flex-row sm:items-center justify-between gap-3',
+                    })}
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-9 h-9 rounded-2xl ${
-                          chapter.badgeColor || 'bg-slate-700'
-                        } text-white flex items-center justify-center font-black text-xs shadow-xs flex-shrink-0`}
+                        className={cn(
+                          'w-9 h-9 rounded-xl text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0',
+                          chapter.badgeColor || TONES.neutral.fill
+                        )}
                       >
                         #{chapter.order}
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight">
+                          <h2 className={text.cardTitle}>
                             {chapter.title}
                           </h2>
                           {isFullyCompleted ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
+                            <span className={pill('success', 'xs')}>
                               <CheckCircle2 className="w-3 h-3" />
                               <span>Completada</span>
                             </span>
                           ) : chapterCompletedCount > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            <span className={pill('info', 'xs')}>
                               {chapterCompletedCount}/{items.length} completados
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className={text.muted}>
                           {chapter.subtitle}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleToggleChapter(chapter.id);
                         }}
-                        className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1"
+                        className={btn('secondary', 'xs')}
                       >
                         <span>{isCollapsed ? 'Ver Etapa' : 'Plegar'}</span>
                         {isCollapsed ? (
-                          <ChevronDown className="w-3.5 h-3.5 text-indigo-500" />
+                          <ChevronDown className={cn('w-3.5 h-3.5', TONES.info.ink)} />
                         ) : (
-                          <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                          <ChevronUp className="w-3.5 h-3.5 text-brand-txt2" />
                         )}
                       </button>
                     </div>
@@ -1030,8 +1009,8 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
 
                   {/* Compact Milestone Strip when Chapter is Collapsed */}
                   {isCollapsed && (
-                    <div className="bg-slate-50/70 dark:bg-slate-900/50 p-2.5 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+                    <div className={inset('border-dashed flex items-center gap-2 flex-wrap')}>
+                      <span className={cn(text.label, 'mr-1')}>
                         Hitos:
                       </span>
                       {items.map((it) => {
@@ -1046,16 +1025,16 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                               key={it.id}
                               type="button"
                               onClick={() => handleToggleChapter(chapter.id)}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold transition-all border shadow-2xs ${
-                                saved
-                                  ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                  : 'bg-white text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                              }`}
+                              className={btn(saved ? 'soft' : 'secondary', 'xs', 'success')}
                             >
-                              <Dice5 className={`w-3 h-3 ${saved ? 'text-emerald-600' : 'text-slate-400'}`} />
+                              {isStarterGiftRoute(it.routeData.id) ? (
+                                <Award className={cn('w-3 h-3', saved ? TONES.success.ink : TONES.warning.ink)} />
+                              ) : (
+                                <Dice5 className={cn('w-3 h-3', saved ? TONES.success.ink : 'text-brand-txt2')} />
+                              )}
                               <span>{it.routeData.name}</span>
                               {saved && (
-                                <span className="font-extrabold text-emerald-700 dark:text-emerald-400">
+                                <span className={cn('font-bold', TONES.success.ink)}>
                                   ({saved.cleanName})
                                 </span>
                               )}
@@ -1070,15 +1049,11 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                               key={it.id}
                               type="button"
                               onClick={() => handleToggleChapter(chapter.id)}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold transition-all border shadow-2xs ${
-                                isDefeated
-                                  ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                  : 'bg-red-50 text-red-800 dark:bg-red-950/60 dark:text-red-300 border-red-200 dark:border-red-800'
-                              }`}
+                              className={btn('soft', 'xs', isDefeated ? 'success' : 'danger')}
                             >
-                              <Swords className={`w-3 h-3 ${isDefeated ? 'text-emerald-600' : 'text-red-500'}`} />
-                              <span>{it.battleData.title}</span>
-                              {isDefeated && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                              <Swords className="w-3 h-3" />
+                              <span>{it.battleData.trainerName}</span>
+                              {isDefeated && <CheckCircle2 className="w-3 h-3" />}
                             </button>
                           );
                         }
@@ -1089,7 +1064,7 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
 
                   {/* Items in this chapter (when expanded) */}
                   {!isCollapsed && (
-                    <div className="space-y-3 pl-1 sm:pl-3 relative border-l-2 border-slate-200 dark:border-slate-800 ml-4 sm:ml-5">
+                    <TimelineRail>
                       {items.map((item) => {
                         if (item.type === 'capture' && item.routeData) {
                           const saved = history.find(
@@ -1098,12 +1073,12 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                               h.routeName.toLowerCase() === item.routeData!.name.toLowerCase()
                           );
                           return (
-                            <div key={item.id} className="relative pl-4 sm:pl-6">
-                              <div
-                                className={`absolute -left-[23px] sm:-left-[31px] top-4 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center ${
-                                  saved ? 'bg-emerald-500' : 'bg-red-500'
-                                }`}
-                              />
+                            <TimelineMilestone
+                              key={item.id}
+                              stepNumber={item.stepNumber}
+                              isComplete={Boolean(saved)}
+                              isNext={nextActiveItem?.id === item.id}
+                            >
                               <StoryRouteCard
                                 route={item.routeData}
                                 stepNumber={item.stepNumber}
@@ -1115,21 +1090,25 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                                 onUpdateStatus={onUpdateStatus}
                                 onDeleteEncounter={onDeleteEncounter}
                                 onOpenManualPicker={onOpenManualPicker}
+                                starterChoice={starterChoice}
+                                onSelectStarter={handleSelectStarter}
                                 compact={isCompact}
+                                hideStepBadge
                               />
-                            </div>
+                            </TimelineMilestone>
                           );
                         }
 
                         if (item.type === 'battle' && item.battleData) {
                           const isDefeated = defeatedBattles.has(item.battleData.id);
                           return (
-                            <div key={item.id} className="relative pl-4 sm:pl-6">
-                              <div
-                                className={`absolute -left-[23px] sm:-left-[31px] top-4 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center ${
-                                  isDefeated ? 'bg-emerald-500' : 'bg-indigo-600'
-                                }`}
-                              />
+                            <TimelineMilestone
+                              key={item.id}
+                              stepNumber={item.stepNumber}
+                              isBattle
+                              isComplete={isDefeated}
+                              isNext={nextActiveItem?.id === item.id}
+                            >
                               <TrainerBattleCard
                                 battle={item.battleData}
                                 starterChoice={starterChoice}
@@ -1138,13 +1117,13 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                                 onToggleDefeated={handleToggleDefeated}
                                 compact={isCompact}
                               />
-                            </div>
+                            </TimelineMilestone>
                           );
                         }
 
                         return null;
                       })}
-                    </div>
+                    </TimelineRail>
                   )}
                 </section>
               );

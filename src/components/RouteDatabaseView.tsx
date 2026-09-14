@@ -1,8 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { RouteData, RouteEncounter, SavedEncounter, GameTenant } from '../types';
-import { parsePokemonName, TYPE_COLORS, getPokemonSprite } from '../utils/pokemonMeta';
+import React, { useState, useEffect, useMemo } from 'react';
+import { RouteData, RouteEncounter, SavedEncounter, GameTenant, EncounterMethod } from '../types';
+import { parsePokemonName, getPokemonSprite } from '../utils/pokemonMeta';
 import { translateWeather, translateMethod } from '../data/routeTranslations';
-import { Search, MapPin, Wind, Sparkles, Filter, Layers, Flame, CheckCircle2, Gamepad2 } from 'lucide-react';
+import { usePokeDetail } from '../context/PokeDetailContext';
+import { TypeBadge } from './TypeBadge';
+import { Search, MapPin, Wind, Sparkles, Layers, Gamepad2 } from 'lucide-react';
+import {
+  cn,
+  panel,
+  card,
+  btn,
+  pill,
+  text,
+  field,
+  layout,
+  spriteFrame,
+  TONES,
+} from '../utils/ui';
+
+const ALL_ZONES_ID = '__all__';
 
 interface RouteDatabaseViewProps {
   routes: RouteData[];
@@ -12,6 +28,18 @@ interface RouteDatabaseViewProps {
   onOpenTenantModal?: () => void;
 }
 
+interface DatabaseRow {
+  key: string;
+  pokemon: string;
+  cleanName: string;
+  chance?: number;
+  levelRange?: string;
+  methods: EncounterMethod[];
+  weather: string;
+  routeName: string;
+  routeNames?: string[];
+}
+
 export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
   routes,
   onSelectRouteForRoll,
@@ -19,67 +47,132 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
   activeTenant,
   onOpenTenantModal,
 }) => {
-  const [selectedRouteId, setSelectedRouteId] = useState<string>(routes[0]?.id || '');
+  const { openDetail } = usePokeDetail();
+  const [selectedRouteId, setSelectedRouteId] = useState<string>(ALL_ZONES_ID);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWeather, setSelectedWeather] = useState<string>('All');
   const [selectedMethod, setSelectedMethod] = useState<string>('All');
 
+  const isAllZones = selectedRouteId === ALL_ZONES_ID;
+  const currentRoute = routes.find((r) => r.id === selectedRouteId) || routes[0];
+
+  const weatherOptions = useMemo(() => {
+    if (isAllZones) {
+      return Array.from(new Set(routes.flatMap((r) => r.weathers)));
+    }
+    return currentRoute?.weathers || [];
+  }, [isAllZones, routes, currentRoute]);
+
+  const methodOptions = useMemo(() => {
+    if (isAllZones) {
+      return Array.from(new Set(routes.flatMap((r) => r.methods)));
+    }
+    return currentRoute?.methods || [];
+  }, [isAllZones, routes, currentRoute]);
+
   // Keep selected route valid when switching tenants
   useEffect(() => {
+    if (selectedRouteId === ALL_ZONES_ID) return;
     if (!routes.some((r) => r.id === selectedRouteId)) {
       setSelectedRouteId(routes[0]?.id || '');
     }
   }, [routes, selectedRouteId]);
 
-  const currentRoute = routes.find((r) => r.id === selectedRouteId) || routes[0];
+  const filteredEncounters = useMemo((): DatabaseRow[] => {
+    const term = searchTerm.trim().toLowerCase();
 
-  // Filter encounters in current route
-  const filteredEncounters = (currentRoute?.encounters || []).filter((enc) => {
-    const matchesSearch =
-      enc.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      enc.cleanName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesWeather = selectedWeather === 'All' || enc.weather === selectedWeather;
-    const matchesMethod =
-      selectedMethod === 'All' ||
-      enc.method === selectedMethod ||
-      (enc.methods && enc.methods.includes(selectedMethod as any));
-    return matchesSearch && matchesWeather && matchesMethod;
-  });
+    const matchesFilters = (enc: RouteEncounter) => {
+      const matchesSearch =
+        !term ||
+        enc.pokemon.toLowerCase().includes(term) ||
+        enc.cleanName.toLowerCase().includes(term);
+      const matchesWeather = selectedWeather === 'All' || enc.weather === selectedWeather;
+      const methods = enc.methods && enc.methods.length > 0 ? enc.methods : [enc.method];
+      const matchesMethod =
+        selectedMethod === 'All' ||
+        enc.method === selectedMethod ||
+        methods.includes(selectedMethod as EncounterMethod);
+      return matchesSearch && matchesWeather && matchesMethod;
+    };
+
+    if (isAllZones) {
+      const unique = new Map<string, DatabaseRow>();
+      routes.forEach((route) => {
+        route.encounters.filter(matchesFilters).forEach((enc) => {
+          const key = enc.pokemon.toLowerCase();
+          const existing = unique.get(key);
+          const methods = enc.methods && enc.methods.length > 0 ? enc.methods : [enc.method];
+          if (existing) {
+            methods.forEach((m) => {
+              if (!existing.methods.includes(m)) existing.methods.push(m);
+            });
+            if (!existing.routeNames?.includes(route.name)) {
+              existing.routeNames = [...(existing.routeNames || [existing.routeName]), route.name];
+            }
+          } else {
+            unique.set(key, {
+              key,
+              pokemon: enc.pokemon,
+              cleanName: enc.cleanName,
+              levelRange: enc.levelRange,
+              methods: [...methods],
+              weather: enc.weather,
+              routeName: route.name,
+              routeNames: [route.name],
+            });
+          }
+        });
+      });
+      return Array.from(unique.values()).sort((a, b) => a.cleanName.localeCompare(b.cleanName, 'es'));
+    }
+
+    return (currentRoute?.encounters || []).filter(matchesFilters).map((enc, idx) => ({
+      key: `${enc.pokemon}-${enc.method}-${enc.weather}-${idx}`,
+      pokemon: enc.pokemon,
+      cleanName: enc.cleanName,
+      chance: enc.chance,
+      levelRange: enc.levelRange,
+      methods: enc.methods && enc.methods.length > 0 ? enc.methods : [enc.method],
+      weather: enc.weather,
+      routeName: currentRoute.name,
+    }));
+  }, [isAllZones, routes, currentRoute, searchTerm, selectedWeather, selectedMethod]);
 
   return (
-    <div id="route-database-view" className="space-y-6">
+    <div id="route-database-view" className={layout.view}>
       {/* Route Picker Banner */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm transition-colors">
+      <div className={panel()}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <h2 className={cn(text.pageTitle, 'flex items-center gap-2')}>
+                <Layers className={cn('w-5 h-5', TONES.info.ink)} />
                 Explorador de la Base de Datos
               </h2>
               {activeTenant && (
                 <button
                   type="button"
                   onClick={onOpenTenantModal}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer"
+                  className={btn('soft', 'xs', 'info', 'rounded-full')}
                   title="Cambiar base de datos"
                 >
                   <Gamepad2 className="w-3 h-3" />
                   <span>{activeTenant.shortName || activeTenant.name} ({activeTenant.region})</span>
-                  <span className="text-[10px] text-indigo-500 underline ml-0.5">Cambiar</span>
+                  <span className="text-[10px] underline ml-0.5">Cambiar</span>
                 </button>
               )}
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Consulta las tablas completas de encuentros, niveles, métodos y porcentajes para {activeTenant?.name || 'este juego'}.
+            <p className={text.muted}>
+              Consulta las tablas completas de encuentros, niveles, métodos y porcentajes para {activeTenant?.name || 'este juego'}. Haz clic en un Pokémon para ver habilidades y movimientos.
             </p>
           </div>
 
           {/* Quick roll button */}
           <button
             type="button"
-            onClick={() => onSelectRouteForRoll(currentRoute.id)}
-            className="px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-md shadow-red-500/20 transition-all flex items-center gap-2 w-fit"
+            onClick={() => currentRoute && onSelectRouteForRoll(currentRoute.id)}
+            disabled={isAllZones || !currentRoute}
+            className={btn('primary', 'md', 'accent', 'w-fit')}
           >
             <Sparkles className="w-4 h-4" />
             Girar Ruleta en esta Ruta
@@ -87,9 +180,9 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
         </div>
 
         {/* Route Select Dropdown */}
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="sm:col-span-1">
-            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Zona o Ruta</label>
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className={field.label}>Zona o Ruta</label>
             <select
               value={selectedRouteId}
               onChange={(e) => {
@@ -97,8 +190,9 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
                 setSelectedWeather('All');
                 setSelectedMethod('All');
               }}
-              className="w-full py-2 px-3 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 cursor-pointer"
+              className={field.select}
             >
+              <option value={ALL_ZONES_ID}>Todas las zonas ({routes.length})</option>
               {routes.map((r) => {
                 const isCaught = history.some(
                   (h) =>
@@ -116,15 +210,15 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
             </select>
           </div>
 
-          <div className="sm:col-span-1">
-            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Filtrar por Clima</label>
+          <div>
+            <label className={field.label}>Filtrar por Clima</label>
             <select
               value={selectedWeather}
               onChange={(e) => setSelectedWeather(e.target.value)}
-              className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer"
+              className={field.select}
             >
-              <option value="All">Todos los climas ({currentRoute?.weathers.length})</option>
-              {currentRoute?.weathers.map((w) => (
+              <option value="All">Todos los climas ({weatherOptions.length})</option>
+              {weatherOptions.map((w) => (
                 <option key={w} value={w}>
                   {translateWeather(w)}
                 </option>
@@ -132,16 +226,32 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
             </select>
           </div>
 
-          <div className="sm:col-span-1">
-            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Buscar Pokémon</label>
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div>
+            <label className={field.label}>Filtrar por Método</label>
+            <select
+              value={selectedMethod}
+              onChange={(e) => setSelectedMethod(e.target.value)}
+              className={field.select}
+            >
+              <option value="All">Todos los métodos</option>
+              {methodOptions.map((m) => (
+                <option key={m} value={m}>
+                  {translateMethod(m)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={field.label}>Buscar Pokémon</label>
+            <div className={field.withIcon}>
+              <Search className={field.icon} />
               <input
                 type="text"
                 placeholder="Nombre del Pokémon..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                className={cn(field.input, field.iconInputPad)}
               />
             </div>
           </div>
@@ -149,30 +259,34 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
       </div>
 
       {/* Encounter Table / Grid */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm transition-colors">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-red-500" />
-            Tabla de Encuentros de {currentRoute.name}
+      <div className={panel()}>
+        <div className="flex items-center justify-between gap-3 pb-4 border-b border-brand-border">
+          <h3 className={cn(text.sectionTitle, 'flex items-center gap-2')}>
+            <MapPin className={cn('w-4 h-4', TONES.accent.ink)} />
+            {isAllZones ? 'Todos los Pokémon del juego' : `Tabla de Encuentros de ${currentRoute?.name || ''}`}
           </h3>
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700">
-            {filteredEncounters.length} registros encontrados
+          <span className={pill('neutral', 'md', 'shrink-0 tabular-nums')}>
+            {filteredEncounters.length} {isAllZones ? 'Pokémon únicos' : 'registros encontrados'}
           </span>
         </div>
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredEncounters.map((enc, idx) => {
+          {filteredEncounters.map((enc) => {
             const { displayName, types } = parsePokemonName(enc.pokemon);
             const { sprite } = getPokemonSprite(enc.pokemon);
-            const primaryType = types[0] || 'Normal';
-            const typeStyle = TYPE_COLORS[primaryType] || TYPE_COLORS['Normal'];
 
             return (
-              <div
-                key={`${enc.pokemon}-${enc.method}-${enc.weather}-${idx}`}
-                className="p-3.5 rounded-2xl border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/70 hover:border-slate-300 dark:hover:border-slate-600 transition-all flex items-center gap-3 shadow-2xs hover:shadow-md"
+              <button
+                key={enc.key}
+                type="button"
+                onClick={() => openDetail('pokemon', enc.pokemon)}
+                title={`Ver estadísticas, habilidades y movimientos de ${displayName}`}
+                className={card({
+                  interactive: true,
+                  extra: 'flex items-center gap-3 text-left cursor-pointer',
+                })}
               >
-                <div className="w-14 h-14 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 flex-shrink-0">
+                <div className={spriteFrame(false, 'w-14 h-14 p-1')}>
                   <img
                     src={sprite}
                     alt={displayName}
@@ -185,39 +299,44 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white truncate">
+                    <h4 className={cn(text.cardTitle, 'truncate')}>
                       {displayName}
                     </h4>
-                    <span className="text-xs font-black text-amber-900 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/70 px-2 py-0.5 rounded-lg border border-amber-300 dark:border-amber-700/80 flex-shrink-0">
-                      {enc.chance}%
-                    </span>
+                    {typeof enc.chance === 'number' && (
+                      <span className={pill('warning', 'sm', 'shrink-0 tabular-nums')}>
+                        {enc.chance}%
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${typeStyle.badge}`}>
-                      {primaryType}
-                    </span>
-                    {(enc.methods && enc.methods.length > 0 ? enc.methods : [enc.method]).map((m) => (
-                      <span
-                        key={m}
-                        className="text-[10px] font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700/80 border border-slate-200/80 dark:border-slate-600 px-1.5 py-0.5 rounded-md"
-                      >
+                    {types.map((type) => (
+                      <TypeBadge key={type} type={type} />
+                    ))}
+                    {enc.methods.map((m) => (
+                      <span key={m} className={pill('neutral', 'xs')}>
                         {translateMethod(m)}
                       </span>
                     ))}
                     {enc.levelRange && (
-                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                      <span className={cn(text.meta, 'font-bold tabular-nums')}>
                         {enc.levelRange}
                       </span>
                     )}
                   </div>
 
-                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5 truncate">
-                    <Wind className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 flex-shrink-0" />
-                    <span className="truncate">{translateWeather(enc.weather)}</span>
+                  <div className={cn(text.meta, 'mt-1.5 flex items-center gap-1.5 truncate')}>
+                    <Wind className={cn('w-3.5 h-3.5 shrink-0', TONES.info.ink)} />
+                    <span className="truncate">
+                      {isAllZones && enc.routeNames
+                        ? enc.routeNames.length > 2
+                          ? `${enc.routeNames.slice(0, 2).join(', ')} +${enc.routeNames.length - 2}`
+                          : enc.routeNames.join(', ')
+                        : translateWeather(enc.weather)}
+                    </span>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

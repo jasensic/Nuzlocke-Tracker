@@ -1,3 +1,210 @@
+/* Tokens and type colors from DESIGN.md. Dark mode is class-based (`.dark`) rather than [data-theme]. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --bg-color: #ffffff;
+  --surf-color: #f4f6f8;
+  --card-color: #ffffff;
+  --card-hover: #f8fafc;
+  --bord-color: #e5e9f0;
+  --txt-primary: #111827;
+  --txt-secondary: #64748b;
+
+  --cta-primary: #ff3b30;
+  --cta-primary-hover: #e03126;
+  /* "ink" = legible text/icon color for the accent over a light/dark surface */
+  --cta-primary-ink: #c62d24;
+
+  --status-live: #10b981;
+  --status-faint: #ef4444;
+  --status-pending: #f59e0b;
+  --status-boxed: #3b82f6;
+
+  /* Ink variants keep tinted chips readable without per-component dark: pairs */
+  --status-live-ink: #047857;
+  --status-faint-ink: #b91c1c;
+  --status-pending-ink: #b45309;
+  --status-boxed-ink: #1d4ed8;
+
+  --type-normal: #a8a77a;
+  --type-fuego: #ee8130;
+  --type-agua: #6390f0;
+  --type-planta: #7ac74c;
+  --type-electrico: #f7d02c;
+  --type-hielo: #96d9d6;
+  --type-lucha: #c22e28;
+  --type-veneno: #a33ea1;
+  --type-tierra: #e2bf65;
+  --type-volador: #a98ff3;
+  --type-psiquico: #f95587;
+  --type-bicho: #a6b91a;
+  --type-dragon: #6f35fc;
+  --type-siniestro: #705746;
+  --type-fantasma: #735797;
+  --type-hada: #d685ad;
+  --type-acero: #b7b7ce;
+  --type-roca: #b6a136;
+}
+
+.dark {
+  --bg-color: #0c1017;
+  --surf-color: #161b26;
+  --card-color: #1e2533;
+  --card-hover: #252e3f;
+  --bord-color: #2b3548;
+  --txt-primary: #f4f6f9;
+  --txt-secondary: #8292a6;
+
+  --cta-primary-ink: #ff8078;
+  --status-live-ink: #34d399;
+  --status-faint-ink: #f87171;
+  --status-pending-ink: #fbbf24;
+  --status-boxed-ink: #60a5fa;
+}
+
+@theme inline {
+  --font-sans: var(--font-family-base);
+
+  --color-brand-bg: var(--bg-color);
+  --color-brand-surface: var(--surf-color);
+  --color-brand-surf: var(--surf-color);
+  --color-brand-card: var(--card-color);
+  --color-brand-card-hover: var(--card-hover);
+  --color-brand-border: var(--bord-color);
+  --color-brand-bord: var(--bord-color);
+  --color-brand-txt1: var(--txt-primary);
+  --color-brand-txt2: var(--txt-secondary);
+  --color-brand-text-primary: var(--txt-primary);
+  --color-brand-text-secondary: var(--txt-secondary);
+  --color-brand-accent: var(--cta-primary);
+  --color-brand-accent-hover: var(--cta-primary-hover);
+  --color-brand-accent-ink: var(--cta-primary-ink);
+
+  --color-status-live: var(--status-live);
+  --color-status-faint: var(--status-faint);
+  --color-status-pending: var(--status-pending);
+  --color-status-boxed: var(--status-boxed);
+
+  --color-status-live-ink: var(--status-live-ink);
+  --color-status-faint-ink: var(--status-faint-ink);
+  --color-status-pending-ink: var(--status-pending-ink);
+  --color-status-boxed-ink: var(--status-boxed-ink);
+
+  --color-pokemon-normal: var(--type-normal);
+  --color-pokemon-fuego: var(--type-fuego);
+  --color-pokemon-agua: var(--type-agua);
+  --color-pokemon-planta: var(--type-planta);
+  --color-pokemon-electrico: var(--type-electrico);
+  --color-pokemon-hielo: var(--type-hielo);
+  --color-pokemon-lucha: var(--type-lucha);
+  --color-pokemon-veneno: var(--type-veneno);
+  --color-pokemon-tierra: var(--type-tierra);
+  --color-pokemon-volador: var(--type-volador);
+  --color-pokemon-psiquico: var(--type-psiquico);
+  --color-pokemon-bicho: var(--type-bicho);
+  --color-pokemon-dragon: var(--type-dragon);
+  --color-pokemon-siniestro: var(--type-siniestro);
+  --color-pokemon-fantasma: var(--type-fantasma);
+  --color-pokemon-hada: var(--type-hada);
+  --color-pokemon-acero: var(--type-acero);
+  --color-pokemon-roca: var(--type-roca);
+}
+
+html {
+  font-family: var(--font-family-base);
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--txt-primary);
+  font-family: var(--font-family-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bord-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--bord-color) 70%, var(--txt-secondary));
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* Shared entrance animations (see `motion` in src/utils/ui.ts) */
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ui-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-fade-in {
+  animation: ui-fade-in 0.18s ease-out both;
+}
+
+.animate-fade-in-up {
+  animation: ui-fade-in-up 0.2s ease-out both;
+}
+
+.animate-pop-in {
+  animation: ui-pop-in 0.2s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-in-up,
+  .animate-pop-in {
+    animation: none;
+  }
+}

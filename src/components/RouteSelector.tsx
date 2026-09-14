@@ -17,6 +17,23 @@ import {
   CircleDot,
   ArrowUpDown,
 } from 'lucide-react';
+import {
+  cn,
+  panel,
+  card,
+  inset,
+  btn,
+  pill,
+  pillSolid,
+  iconTile,
+  text,
+  field,
+  layout,
+  filterChip,
+  segmented,
+  spriteFrame,
+  TONES,
+} from '../utils/ui';
 
 interface RouteSelectorProps {
   routes: RouteData[];
@@ -109,37 +126,37 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
   return (
     <div
       id="route-selector-container"
-      className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-4"
+      className={panel('space-y-4')}
     >
       {/* Top Header: Route title & Level Range Badge & Nuzlocke Summary */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-brand-border">
         <div className="flex items-center gap-2 flex-wrap">
-          <label htmlFor="route-dropdown-select" className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-            <MapPin className="w-5 h-5 text-red-500" />
+          <label htmlFor="route-dropdown-select" className={cn(text.sectionTitle, 'flex items-center gap-1.5')}>
+            <MapPin className={cn('w-5 h-5', TONES.accent.ink)} />
             Zona / Ruta
           </label>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-200 flex items-center gap-1">
-            <Flame className="w-3 h-3 text-amber-600" />
+          <span className={pill('warning', 'sm', 'tabular-nums')}>
+            <Flame className="w-3 h-3" />
             {currentRoute?.levelDisplay || 'Nv. ?'}
           </span>
-          <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+          <span className={pill('neutral', 'sm')}>
             {currentRoute?.category}
           </span>
         </div>
 
         {/* Nuzlocke Progress Pill */}
-        <div className="flex items-center gap-2 text-xs">
-          <div className="bg-slate-100 text-slate-700 font-semibold px-3 py-1 rounded-full flex items-center gap-2 border border-slate-200/60">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+        <div className="flex items-center gap-2">
+          <div className={pill('neutral', 'md', 'gap-2 tabular-nums')}>
+            <ShieldCheck className={cn('w-3.5 h-3.5', TONES.success.ink)} />
             <span>
               Progreso Nuzlocke:{' '}
-              <strong className="text-emerald-700">{completedRoutesCount}</strong> / {totalRoutesCount} rutas
+              <strong className={TONES.success.ink}>{completedRoutesCount}</strong> / {totalRoutesCount} rutas
             </span>
           </div>
           <button
             type="button"
             onClick={() => setShowProgressionDrawer(!showProgressionDrawer)}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
+            className={btn('soft', 'sm', 'info', 'rounded-full')}
           >
             {showProgressionDrawer ? 'Ocultar Lista de Niveles' : 'Ver Orden por Niveles'}
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showProgressionDrawer ? 'rotate-180' : ''}`} />
@@ -149,13 +166,13 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
 
       {/* Nuzlocke Quick Progression Strip (Collapsible) */}
       {showProgressionDrawer && (
-        <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+        <div className={inset('space-y-2')}>
+          <div className={cn('flex items-center justify-between gap-2', text.labelStrong)}>
             <span className="flex items-center gap-1">
-              <ArrowUpDown className="w-3.5 h-3.5 text-indigo-600" />
+              <ArrowUpDown className={cn('w-3.5 h-3.5', TONES.info.ink)} />
               Rutas ordenadas de menor a mayor nivel (Progreso Nuzlocke):
             </span>
-            <span className="text-slate-500 font-normal">Haz clic en una para seleccionarla</span>
+            <span className={text.meta}>Haz clic en una para seleccionarla</span>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 pt-1 scrollbar-thin">
             {routes.map((r, idx) => {
@@ -168,34 +185,30 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
                   key={r.id}
                   type="button"
                   onClick={() => onRouteChange(r.id)}
-                  className={`flex-shrink-0 px-3 py-2 rounded-xl text-left border transition-all text-xs flex flex-col gap-0.5 ${
-                    isSelected
-                      ? 'border-indigo-600 bg-indigo-50/90 shadow-sm ring-2 ring-indigo-500/20'
-                      : isCaught
-                      ? 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50'
-                      : 'border-slate-200 bg-white hover:bg-slate-100/80'
-                  }`}
+                  className={card({
+                    interactive: true,
+                    active: isSelected,
+                    tone: isCaught ? 'success' : 'neutral',
+                    padding: 'compact',
+                    extra: 'shrink-0 text-left text-xs flex flex-col gap-0.5 min-w-[8.5rem]',
+                  })}
                 >
                   <div className="flex items-center justify-between gap-1.5">
-                    <span className="font-bold text-[10px] text-slate-400">#{idx + 1}</span>
-                    <span
-                      className={`text-[10px] font-black px-1.5 py-0.2 rounded ${
-                        isCaught ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
+                    <span className={cn(text.meta, 'font-semibold')}>#{idx + 1}</span>
+                    <span className={pill(isCaught ? 'success' : 'warning', 'xs')}>
                       {r.levelDisplay}
                     </span>
                   </div>
-                  <div className="font-bold text-slate-800 truncate max-w-[130px]">{r.name}</div>
-                  <div className="flex items-center gap-1 text-[10px] mt-0.5">
+                  <div className={cn(text.subtitle, 'truncate max-w-[130px]')}>{r.name}</div>
+                  <div className={cn('flex items-center gap-1 mt-0.5', text.meta)}>
                     {isCaught ? (
-                      <span className="text-emerald-700 font-semibold flex items-center gap-0.5 truncate max-w-[120px]">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
+                      <span className={cn('font-semibold flex items-center gap-0.5 truncate max-w-[120px]', TONES.success.ink)}>
+                        <CheckCircle2 className="w-3 h-3 shrink-0" />
                         {encs[0].cleanName || encs[0].pokemon}
                       </span>
                     ) : (
-                      <span className="text-slate-400 flex items-center gap-0.5">
-                        <CircleDot className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                      <span className="flex items-center gap-0.5">
+                        <CircleDot className="w-3 h-3 shrink-0" />
                         Disponible
                       </span>
                     )}
@@ -211,10 +224,13 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
       {currentRouteCaught && latestCaught ? (
         <div
           id="nuzlocke-route-alert-caught"
-          className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50/70 border-2 border-emerald-300 text-slate-800 flex items-start sm:items-center justify-between gap-3 shadow-xs"
+          className={card({
+            tone: 'success',
+            extra: 'flex items-start sm:items-center justify-between gap-3',
+          })}
         >
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white border border-emerald-200 flex items-center justify-center p-1 relative flex-shrink-0 shadow-xs">
+            <div className={spriteFrame(false, 'w-12 h-12 p-1 relative')}>
               <img
                 src={getPokemonSprite(latestCaught.pokemon).sprite}
                 alt={latestCaught.pokemon}
@@ -223,54 +239,57 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
                   (e.target as HTMLImageElement).style.opacity = '0.3';
                 }}
               />
-              <span className="absolute -top-1.5 -right-1.5 bg-emerald-600 text-white rounded-full p-0.5">
+              <span className={cn('absolute -top-1.5 -right-1.5 rounded-full p-0.5', TONES.success.solid)}>
                 <CheckCircle2 className="w-3 h-3" />
               </span>
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-600 text-white">
+                <span className={pillSolid('success', 'sm')}>
                   ✓ Zona Ya Registrada en Bitácora
                 </span>
-                <span className="text-xs font-semibold text-emerald-800">
+                <span className={cn(text.muted, 'font-semibold', TONES.success.ink)}>
                   {latestCaught.nickname
                     ? `${latestCaught.nickname} (${latestCaught.pokemon})`
                     : latestCaught.pokemon}
                 </span>
               </div>
-              <p className="text-xs text-slate-600 mt-1">
+              <p className={cn(text.muted, 'mt-1')}>
                 <strong>Regla Nuzlocke:</strong> Ya tienes un Pokémon capturado en{' '}
                 <strong>{currentRoute?.name}</strong>. Estado actual:{' '}
-                <span className="font-semibold text-emerald-900">{latestCaught.status}</span> ({latestCaught.method}).
+                <span className="font-semibold">{latestCaught.status}</span> ({latestCaught.method}).
               </p>
             </div>
           </div>
-          <span className="hidden md:inline-flex px-3 py-1 bg-white/80 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 text-center">
+          <span className={cn(pill('success', 'md'), 'hidden md:inline-flex')}>
             Primer Encuentro Ya Consumido
           </span>
         </div>
       ) : (
         <div
           id="nuzlocke-route-alert-available"
-          className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-sky-50 via-indigo-50/40 to-white border border-sky-200 text-slate-800 flex items-center justify-between gap-3"
+          className={card({
+            tone: 'info',
+            extra: 'flex items-center justify-between gap-3',
+          })}
         >
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-sky-100 text-sky-700 flex-shrink-0">
+            <span className={iconTile('info')}>
               <Sparkles className="w-4 h-4" />
-            </div>
+            </span>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-sky-900">
-                  🟢 Zona Disponible para 1er Encuentro (Nuzlocke)
+                <span className={cn(text.subtitle, TONES.info.ink)}>
+                  Zona Disponible para 1er Encuentro (Nuzlocke)
                 </span>
               </div>
-              <p className="text-xs text-slate-600">
+              <p className={text.muted}>
                 Aún no has registrado ningún Pokémon en <strong>{currentRoute?.name}</strong> ({currentRoute?.levelDisplay}).
                 ¡Tu próxima tirada aquí será tu encuentro oficial!
               </p>
             </div>
           </div>
-          <span className="hidden sm:inline-flex px-2.5 py-1 bg-white border border-sky-200 rounded-lg text-xs font-bold text-sky-700 flex-shrink-0">
+          <span className={cn(pill('info', 'md'), 'hidden sm:inline-flex shrink-0')}>
             {availableCount} especies
           </span>
         </div>
@@ -279,41 +298,29 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
       {/* Filter Tabs & Search Controls */}
       <div className="space-y-2.5">
         {/* Nuzlocke Status Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-          <span className="text-slate-400 mr-1 text-[11px] font-bold uppercase tracking-wider">Filtrar:</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={cn(text.label, 'mr-1')}>Filtrar:</span>
           <button
             type="button"
             onClick={() => setNuzlockeFilter('all')}
-            className={`px-3 py-1 rounded-xl transition-all ${
-              nuzlockeFilter === 'all'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
+            className={filterChip(nuzlockeFilter === 'all')}
           >
             Todas ({totalRoutesCount})
           </button>
           <button
             type="button"
             onClick={() => setNuzlockeFilter('pending')}
-            className={`px-3 py-1 rounded-xl transition-all flex items-center gap-1.5 ${
-              nuzlockeFilter === 'pending'
-                ? 'bg-sky-600 text-white shadow-xs'
-                : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200/60'
-            }`}
+            className={filterChip(nuzlockeFilter === 'pending', 'info')}
           >
-            <CircleDot className="w-3.5 h-3.5 text-sky-500" />
+            <CircleDot className="w-3.5 h-3.5" />
             Pendientes ({pendingRoutesCount})
           </button>
           <button
             type="button"
             onClick={() => setNuzlockeFilter('completed')}
-            className={`px-3 py-1 rounded-xl transition-all flex items-center gap-1.5 ${
-              nuzlockeFilter === 'completed'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
-            }`}
+            className={filterChip(nuzlockeFilter === 'completed', 'success')}
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            <CheckCircle2 className="w-3.5 h-3.5" />
             Ya Capturadas ({completedRoutesCount})
           </button>
         </div>
@@ -325,11 +332,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
               key={cat}
               type="button"
               onClick={() => setCategoryFilter(cat)}
-              className={`px-2.5 py-1 rounded-lg transition-colors ${
-                categoryFilter === cat
-                  ? 'bg-slate-800 text-white font-semibold'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+              className={filterChip(categoryFilter === cat)}
             >
               {cat === 'All' ? 'Todas las Categorías' : cat}
             </button>
@@ -338,15 +341,15 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
 
         {/* Search input + Route Select Dropdown */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className={field.withIcon}>
+            <Search className={field.icon} />
             <input
               id="route-search-input"
               type="text"
               placeholder="Buscar zona o nivel (ej. Ruta 1, Nv. 3, Axewell)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+              className={cn(field.input, field.iconInputPad)}
             />
           </div>
 
@@ -355,7 +358,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
               id="route-dropdown-select"
               value={selectedRouteId}
               onChange={(e) => onRouteChange(e.target.value)}
-              className="w-full py-2 px-3 text-sm font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+              className={field.select}
             >
               {filteredRoutes.map((r, index) => {
                 const encs = getRouteEncounters(r);
@@ -374,21 +377,21 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
       </div>
 
       {/* Weather, Method, and Probability Settings */}
-      <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={cn('pt-3 grid grid-cols-1 sm:grid-cols-3 gap-3', layout.divider)}>
         {/* Weather Selector */}
         <div>
           <label
             htmlFor="weather-filter-select"
-            className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1"
+            className={cn(field.label, 'flex items-center gap-1')}
           >
-            <Wind className="w-3.5 h-3.5 text-blue-500" />
+            <Wind className={cn('w-3.5 h-3.5', TONES.info.ink)} />
             Clima en la ruta
           </label>
           <select
             id="weather-filter-select"
             value={selectedWeather}
             onChange={(e) => onWeatherChange(e.target.value)}
-            className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400 font-medium"
+            className={field.select}
           >
             <option value="All">Cualquier Clima ({currentRoute?.weathers.length || 0} disponibles)</option>
             {currentRoute?.weathers.map((w) => (
@@ -403,16 +406,16 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
         <div>
           <label
             htmlFor="method-filter-select"
-            className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1"
+            className={cn(field.label, 'flex items-center gap-1')}
           >
-            <Filter className="w-3.5 h-3.5 text-emerald-500" />
+            <Filter className={cn('w-3.5 h-3.5', TONES.success.ink)} />
             Método de encuentro
           </label>
           <select
             id="method-filter-select"
             value={selectedMethod}
             onChange={(e) => onMethodChange(e.target.value as EncounterMethod | 'All')}
-            className="w-full py-1.5 px-2.5 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-400 font-medium"
+            className={field.select}
           >
             <option value="All">Cualquier Método</option>
             {currentRoute?.methods.map((m) => (
@@ -433,18 +436,16 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
 
         {/* Probability Mode Toggle */}
         <div>
-          <span className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
-            <Dice5 className="w-3.5 h-3.5 text-purple-500" />
+          <span className={cn(field.label, 'flex items-center gap-1')}>
+            <Dice5 className={cn('w-3.5 h-3.5', TONES.info.ink)} />
             Modo de Probabilidad
           </span>
-          <div className="flex rounded-lg p-0.5 bg-slate-100 border border-slate-200 text-xs font-semibold">
+          <div className={segmented.group}>
             <button
               id="mode-weighted-button"
               type="button"
               onClick={() => onToggleWeighted(true)}
-              className={`flex-1 py-1 px-1.5 rounded-md text-center transition-all ${
-                isWeighted ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className={segmented.item(isWeighted, 'flex-1')}
               title="Usa los porcentajes exactos del juego"
             >
               % Real
@@ -453,9 +454,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
               id="mode-uniform-button"
               type="button"
               onClick={() => onToggleWeighted(false)}
-              className={`flex-1 py-1 px-1.5 rounded-md text-center transition-all ${
-                !isWeighted ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className={segmented.item(!isWeighted, 'flex-1')}
               title="Misma probabilidad para todos los disponibles"
             >
               Equitativo

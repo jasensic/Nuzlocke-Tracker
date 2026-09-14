@@ -317,7 +317,7 @@ const BLESSED_SHIELD_BLUEPRINT: BlueprintItem[] = [
     type: 'battle',
     title: 'Líder de Gimnasio: Milo (Percy) 🏅',
     subtitle: 'Gimnasio Hoyuelo: Tu primera prueba oficial por la Medalla Planta',
-    battleId: 'gym-milo',
+    battleId: 'gym-milo-turffield',
   },
 
   // --- CAPÍTULO 4: GIMNASIO PLIÉ (AGUA) ---
@@ -347,7 +347,7 @@ const BLESSED_SHIELD_BLUEPRINT: BlueprintItem[] = [
     type: 'battle',
     title: 'Líder de Gimnasio: Nessa (Cathy) 🏅',
     subtitle: 'Gimnasio Plié: Domina las corrientes marinas y consigue la Medalla Agua',
-    battleId: 'gym-nessa',
+    battleId: 'gym-nessa-hulbury',
   },
 
   // --- CAPÍTULO 5: GIMNASIO PISTÓN (FUEGO) ---
@@ -384,7 +384,7 @@ const BLESSED_SHIELD_BLUEPRINT: BlueprintItem[] = [
     type: 'battle',
     title: 'Líder de Gimnasio: Kabu 🏅',
     subtitle: 'Gimnasio Pistón: El veterano maestro del fuego y la Medalla Fuego',
-    battleId: 'gym-kabu',
+    battleId: 'gym-kabu-motostoke',
   },
 
   // --- CAPÍTULO 6: GIMNASIO LADERA (FANTASMA) ---
@@ -448,8 +448,8 @@ const BLESSED_SHIELD_BLUEPRINT: BlueprintItem[] = [
     chapterKey: 'gym4',
     type: 'battle',
     title: 'Líder de Gimnasio: Allister (Alistair) 🏅',
-    subtitle: 'Gimnasio Ladera: Exclusivo de Escudo, combate sombrío por la Medalla Fantasma',
-    battleId: 'gym-allister',
+    subtitle: 'Gimnasio Ladera: Combate doble sombrío por la Medalla Fantasma',
+    battleId: 'gym-allister-stow-on-side',
   },
   {
     chapterKey: 'gym4',
@@ -479,7 +479,14 @@ const BLESSED_SHIELD_BLUEPRINT: BlueprintItem[] = [
     type: 'battle',
     title: 'Líder de Gimnasio: Opal (Sally) 🏅',
     subtitle: 'Gimnasio Plié: La prueba teatral con preguntas y la codiciada Medalla Hada',
-    battleId: 'gym-opal',
+    battleId: 'gym-opal-ballonlea',
+  },
+  {
+    chapterKey: 'gym5',
+    type: 'battle',
+    title: 'Entrenadora Eviolite: Bea (Judith) 🥋',
+    subtitle: 'Pueblo Plié: Combate doble de la Líder de Lucha (aparición en Blessed Shield)',
+    battleId: 'gym-bea-ballonlea',
   },
 
   // --- CAPÍTULO 8: GIMNASIO AURIGA (HIELO) ---
@@ -521,9 +528,16 @@ const BLESSED_SHIELD_BLUEPRINT: BlueprintItem[] = [
   {
     chapterKey: 'gym6',
     type: 'battle',
+    title: 'Líder de Gimnasio: Gordie (Morris) 🏅',
+    subtitle: 'Gimnasio Auriga: Combate doble de Roca, contraparte de Espada',
+    battleId: 'gym-gordie-circhester',
+  },
+  {
+    chapterKey: 'gym6',
+    type: 'battle',
     title: 'Líder de Gimnasio: Melony (Mel) 🏅',
-    subtitle: 'Gimnasio Auriga: Exclusivo de Escudo, hielo implacable por la Medalla Hielo',
-    battleId: 'gym-melony',
+    subtitle: 'Gimnasio Auriga: Combate doble de hielo por la Medalla Hielo (Escudo)',
+    battleId: 'gym-melony-circhester',
   },
   {
     chapterKey: 'gym6',
@@ -553,7 +567,7 @@ const BLESSED_SHIELD_BLUEPRINT: BlueprintItem[] = [
     type: 'battle',
     title: 'Líder de Gimnasio: Piers (Nerio) 🏅',
     subtitle: 'Gimnasio Crampón: Combate puro sin fenómeno Dinamax por la Medalla Siniestro',
-    battleId: 'gym-piers',
+    battleId: 'gym-piers-spikemuth',
   },
   {
     chapterKey: 'gym7',
@@ -590,7 +604,7 @@ const BLESSED_SHIELD_BLUEPRINT: BlueprintItem[] = [
     type: 'battle',
     title: 'Líder de Gimnasio: Raihan (Roy) 🏅',
     subtitle: 'Gimnasio Artejo: Combate doble con sinergia de climas por la Medalla Dragón',
-    battleId: 'gym-raihan',
+    battleId: 'gym-raihan-hammerlocke',
   },
 
   // --- CAPÍTULO 11: RUTA 10 Y MACRO COSMOS ---

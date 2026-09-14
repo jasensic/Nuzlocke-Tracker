@@ -1,6 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { parsePokemonName, TYPE_COLORS, getPokemonSprite } from '../utils/pokemonMeta';
+import { TypeBadge } from './TypeBadge';
+import { cn, card, pill, text } from '../utils/ui';
 
 interface EncounterWheelProps {
   isSpinning: boolean;
@@ -21,11 +23,19 @@ export const EncounterWheel: React.FC<EncounterWheelProps> = ({ isSpinning, acti
       key={activeCandidate}
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/90 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-md w-full max-w-sm transition-colors"
+      className={card({
+        padding: 'compact',
+        extra: 'flex flex-col items-center justify-center w-full max-w-sm',
+      })}
     >
       <div className="relative w-28 h-28 flex items-center justify-center">
         {isSpinning ? (
-          <div className="w-20 h-20 rounded-full bg-slate-200/80 dark:bg-slate-700/80 animate-pulse flex items-center justify-center">
+          <div
+            className={cn(
+              'w-20 h-20 rounded-full bg-brand-surface border-2 animate-pulse flex items-center justify-center',
+              typeStyle.border
+            )}
+          >
             <img
               key={`spin-${activeCandidate}`}
               src={sprite}
@@ -51,17 +61,17 @@ export const EncounterWheel: React.FC<EncounterWheelProps> = ({ isSpinning, acti
       </div>
 
       <div className="mt-2 text-center">
-        <span
-          className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full uppercase tracking-wider ${typeStyle.badge}`}
-        >
-          {formLabel ? `${formLabel} • ` : ''}
-          {types.join(' / ')}
-        </span>
-        <h4 className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight mt-1">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {formLabel && <span className={pill('neutral', 'xs')}>{formLabel}</span>}
+          {types.map((t) => (
+            <TypeBadge key={t} type={t} />
+          ))}
+        </div>
+        <h4 className={cn(text.sectionTitle, 'mt-1')}>
           {displayName}
         </h4>
         {isSpinning && (
-          <p className="text-xs text-slate-400 dark:text-slate-400 animate-pulse font-medium">Buscando en la hierba...</p>
+          <p className={cn(text.muted, 'font-medium animate-pulse')}>Buscando en la hierba...</p>
         )}
       </div>
     </motion.div>

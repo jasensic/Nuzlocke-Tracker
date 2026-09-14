@@ -10,7 +10,25 @@ import {
   ItemDetail,
   PokemonDetail,
 } from '../services/pokeApiService';
-import { TYPE_COLORS } from '../utils/pokemonMeta';
+import { TypeBadge } from './TypeBadge';
+import { PokemonLearnMove } from '../services/pokeApiService';
+import {
+  cn,
+  card,
+  inset,
+  btn,
+  iconBtn,
+  pill,
+  statTile,
+  iconTile,
+  text,
+  surface,
+  layout,
+  segmented,
+  spriteFrame,
+  TONES,
+  type Tone,
+} from '../utils/ui';
 import {
   X,
   Sparkles,
@@ -20,7 +38,6 @@ import {
   Gauge,
   Swords,
   Info,
-  Layers,
   ArrowRight,
   Scale,
   Ruler,
@@ -63,6 +80,10 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
     let isCancelled = false;
     setIsLoading(true);
     setError(null);
+    setMoveData(null);
+    setAbilityData(null);
+    setItemData(null);
+    setPokemonData(null);
 
     async function fetchData() {
       try {
@@ -95,46 +116,41 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
     };
   }, [type, name]);
 
-  const typeConfig =
+  const typeConfig: { title: string; icon: typeof Swords; tone: Tone } =
     type === 'move'
-      ? { title: 'Detalles del Movimiento', icon: Swords, color: 'text-red-500 bg-red-50 dark:bg-red-950/60' }
+      ? { title: 'Detalles del Movimiento', icon: Swords, tone: 'danger' }
       : type === 'ability'
-      ? { title: 'Detalles de la Habilidad', icon: Zap, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/60' }
+      ? { title: 'Detalles de la Habilidad', icon: Zap, tone: 'warning' }
       : type === 'item'
-      ? { title: 'Detalles del Objeto', icon: Shield, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/60' }
-      : { title: 'Detalles del Pokémon', icon: Sparkles, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/60' };
+      ? { title: 'Detalles del Objeto', icon: Shield, tone: 'info' }
+      : { title: 'Detalles del Pokémon', icon: Sparkles, tone: 'success' };
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className={surface.overlay}
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className={cn(surface.modal, 'max-w-2xl')}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top Bar */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className={`p-2 rounded-xl ${typeConfig.color}`}>
-              <typeConfig.icon className="w-4 h-4" />
+        <div className="px-5 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={iconTile(typeConfig.tone)}>
+              <typeConfig.icon className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                {typeConfig.title}
-              </span>
-              <h2 className="text-base font-black text-slate-900 dark:text-white capitalize">
-                {name}
-              </h2>
+              <h3 className={text.sectionTitle}>{typeConfig.title}</h3>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className={iconBtn('ghost', 'md')}
             title="Cerrar modal"
           >
             <X className="w-5 h-5" />
@@ -142,16 +158,16 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 max-h-[80vh] overflow-y-auto space-y-4">
+        <div className={cn(layout.divider, 'p-5 max-h-[80vh] overflow-y-auto space-y-4')}>
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-3">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-              <p className="text-xs font-bold text-slate-500">
+              <Loader2 className={cn('w-8 h-8 animate-spin', TONES.info.ink)} />
+              <p className={cn(text.muted, 'font-bold')}>
                 Consultando PokéAPI (pokenode-ts)...
               </p>
             </div>
           ) : error ? (
-            <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 space-y-2">
+            <div className={card({ tone: 'danger', extra: 'space-y-2' })}>
               <div className="flex items-center gap-2 font-bold text-xs">
                 <AlertCircle className="w-4 h-4" />
                 <span>Error al consultar la API</span>
@@ -164,11 +180,11 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
               {/* Header Title & Types */}
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                  <h3 className={text.pageTitle}>
                     {moveData.name}
                   </h3>
                   {moveData.originalName !== moveData.name && (
-                    <p className="text-xs text-slate-400 font-medium">
+                    <p className={text.muted}>
                       Nombre en inglés: <strong>{moveData.originalName}</strong>
                     </p>
                   )}
@@ -176,23 +192,18 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
 
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {/* Type Badge */}
-                  <span
-                    className={`px-2.5 py-1 rounded-xl text-xs font-black shadow-2xs ${
-                      TYPE_COLORS[moveData.type]?.badge || 'bg-slate-200 text-slate-800'
-                    }`}
-                  >
-                    {moveData.type}
-                  </span>
+                  <TypeBadge type={moveData.type} />
 
                   {/* Damage Class Badge */}
                   <span
-                    className={`px-2.5 py-1 rounded-xl text-xs font-black border ${
+                    className={pill(
                       moveData.damageClass === 'physical'
-                        ? 'bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 border-orange-200 dark:border-orange-800'
+                        ? 'warning'
                         : moveData.damageClass === 'special'
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                    }`}
+                        ? 'info'
+                        : 'neutral',
+                      'md'
+                    )}
                   >
                     {moveData.damageClass === 'physical'
                       ? '💥 Físico'
@@ -206,69 +217,69 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
               {/* Stat Grid: Potencia, Precisión, PP, Prioridad */}
               <div className="grid grid-cols-4 gap-2 text-center">
                 {/* Potencia */}
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
-                  <div className="text-[10px] font-extrabold uppercase text-slate-400 flex items-center justify-center gap-1">
-                    <Swords className="w-3 h-3 text-red-500" />
+                <div className={statTile()}>
+                  <div className={cn(text.label, 'flex items-center justify-center gap-1')}>
+                    <Swords className={cn('w-3 h-3', TONES.danger.ink)} />
                     <span>Potencia</span>
                   </div>
-                  <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mt-1">
+                  <div className={cn(text.stat, 'mt-1')}>
                     {moveData.power !== null ? moveData.power : '—'}
                   </div>
                 </div>
 
                 {/* Precisión */}
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
-                  <div className="text-[10px] font-extrabold uppercase text-slate-400 flex items-center justify-center gap-1">
-                    <Crosshair className="w-3 h-3 text-indigo-500" />
+                <div className={statTile()}>
+                  <div className={cn(text.label, 'flex items-center justify-center gap-1')}>
+                    <Crosshair className={cn('w-3 h-3', TONES.info.ink)} />
                     <span>Precisión</span>
                   </div>
-                  <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mt-1">
+                  <div className={cn(text.stat, 'mt-1')}>
                     {moveData.accuracy !== null ? `${moveData.accuracy}%` : '—'}
                   </div>
                 </div>
 
                 {/* PP */}
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
-                  <div className="text-[10px] font-extrabold uppercase text-slate-400 flex items-center justify-center gap-1">
-                    <Gauge className="w-3 h-3 text-emerald-500" />
+                <div className={statTile()}>
+                  <div className={cn(text.label, 'flex items-center justify-center gap-1')}>
+                    <Gauge className={cn('w-3 h-3', TONES.success.ink)} />
                     <span>PP</span>
                   </div>
-                  <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mt-1">
+                  <div className={cn(text.stat, 'mt-1')}>
                     {moveData.pp}
                   </div>
                 </div>
 
                 {/* Prioridad */}
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
-                  <div className="text-[10px] font-extrabold uppercase text-slate-400 flex items-center justify-center gap-1">
-                    <Zap className="w-3 h-3 text-amber-500" />
+                <div className={statTile()}>
+                  <div className={cn(text.label, 'flex items-center justify-center gap-1')}>
+                    <Zap className={cn('w-3 h-3', TONES.warning.ink)} />
                     <span>Prioridad</span>
                   </div>
-                  <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mt-1">
+                  <div className={cn(text.stat, 'mt-1')}>
                     {moveData.priority > 0 ? `+${moveData.priority}` : moveData.priority}
                   </div>
                 </div>
               </div>
 
               {/* Description */}
-              <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 space-y-1">
-                <div className="text-[11px] font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5" />
+              <div className={inset('space-y-1')}>
+                <div className={cn(text.label, 'flex items-center gap-1.5')}>
+                  <Info className={cn('w-3.5 h-3.5', TONES.info.ink)} />
                   <span>Descripción en combate:</span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                <p className={cn(text.body, 'leading-relaxed')}>
                   {moveData.description}
                 </p>
               </div>
 
               {/* Detailed Effect */}
               {moveData.effect && moveData.effect !== moveData.description && (
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                  <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <div className={inset('space-y-1')}>
+                  <div className={cn(text.label, 'flex items-center gap-1.5')}>
+                    <Sparkles className={cn('w-3.5 h-3.5', TONES.warning.ink)} />
                     <span>Mecánica detallada:</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <p className={cn(text.muted, 'leading-relaxed')}>
                     {moveData.effect}
                   </p>
                 </div>
@@ -279,37 +290,37 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                  <h3 className={text.pageTitle}>
                     {abilityData.name}
                   </h3>
                   {abilityData.originalName !== abilityData.name && (
-                    <p className="text-xs text-slate-400 font-medium">
+                    <p className={text.muted}>
                       Nombre en inglés: <strong>{abilityData.originalName}</strong>
                     </p>
                   )}
                 </div>
-                <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                <span className={pill('warning', 'md')}>
                   Habilidad
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/60 space-y-1">
-                <div className="text-[11px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5" />
+              <div className={inset('space-y-1')}>
+                <div className={cn(text.label, 'flex items-center gap-1.5')}>
+                  <Zap className={cn('w-3.5 h-3.5', TONES.warning.ink)} />
                   <span>Descripción oficial:</span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                <p className={cn(text.body, 'leading-relaxed')}>
                   {abilityData.description}
                 </p>
               </div>
 
               {abilityData.effect && abilityData.effect !== abilityData.description && (
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                  <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <div className={inset('space-y-1')}>
+                  <div className={cn(text.label, 'flex items-center gap-1.5')}>
+                    <Sparkles className={cn('w-3.5 h-3.5', TONES.warning.ink)} />
                     <span>Efecto en combate:</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <p className={cn(text.muted, 'leading-relaxed')}>
                     {abilityData.effect}
                   </p>
                 </div>
@@ -319,7 +330,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
             /* ================= ITEM VIEW ================= */
             <div className="space-y-4">
               <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-2 flex-shrink-0">
+                <div className={spriteFrame(false, 'w-14 h-14 p-2')}>
                   <img
                     src={itemData.sprite}
                     alt={itemData.name}
@@ -329,37 +340,37 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                 </div>
 
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                  <h3 className={text.pageTitle}>
                     {itemData.name}
                   </h3>
                   {itemData.originalName !== itemData.name && (
-                    <p className="text-xs text-slate-400 font-medium">
+                    <p className={text.muted}>
                       En inglés: <strong>{itemData.originalName}</strong>
                     </p>
                   )}
-                  <span className="inline-block mt-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  <span className={pill('info', 'xs', 'mt-1')}>
                     {itemData.category}
                   </span>
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 space-y-1">
-                <div className="text-[11px] font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5" />
+              <div className={inset('space-y-1')}>
+                <div className={cn(text.label, 'flex items-center gap-1.5')}>
+                  <Shield className={cn('w-3.5 h-3.5', TONES.info.ink)} />
                   <span>Efecto del objeto:</span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                <p className={cn(text.body, 'leading-relaxed')}>
                   {itemData.description}
                 </p>
               </div>
 
               {itemData.effect && itemData.effect !== itemData.description && (
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                  <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <div className={inset('space-y-1')}>
+                  <div className={cn(text.label, 'flex items-center gap-1.5')}>
+                    <Sparkles className={cn('w-3.5 h-3.5', TONES.warning.ink)} />
                     <span>Mecánica al equipar:</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <p className={cn(text.muted, 'leading-relaxed')}>
                     {itemData.effect}
                   </p>
                 </div>
@@ -370,7 +381,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
             <div className="space-y-4">
               {/* Header: Artwork, Name, Types */}
               <div className="flex items-center gap-4">
-                <div className="relative w-20 h-20 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 overflow-hidden flex-shrink-0">
+                <div className={spriteFrame(false, 'relative w-20 h-20 p-1')}>
                   <img
                     src={pokemonData.sprites.artwork}
                     alt={pokemonData.displayName}
@@ -381,10 +392,10 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400">
+                    <span className={cn(text.muted, 'font-bold')}>
                       #{String(pokemonData.id).padStart(3, '0')}
                     </span>
-                    <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white capitalize truncate">
+                    <h3 className={cn(text.pageTitle, 'capitalize truncate')}>
                       {pokemonData.displayName}
                     </h3>
                   </div>
@@ -392,19 +403,12 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                   {/* Types */}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {pokemonData.types.map((t) => (
-                      <span
-                        key={t.name}
-                        className={`text-xs font-extrabold px-2 py-0.5 rounded-lg shadow-2xs ${
-                          TYPE_COLORS[t.es]?.badge || 'bg-slate-200 text-slate-800'
-                        }`}
-                      >
-                        {t.es}
-                      </span>
+                      <TypeBadge key={t.name} type={t.es} />
                     ))}
                   </div>
 
                   {/* Height & Weight */}
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
+                  <div className={cn(text.muted, 'flex items-center gap-3 mt-1.5')}>
                     <span className="flex items-center gap-1">
                       <Ruler className="w-3.5 h-3.5" />
                       {pokemonData.heightMeters} m
@@ -419,10 +423,10 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
               </div>
 
               {/* Base Stats */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+              <div className={card({ extra: 'space-y-2' })}>
+                <div className={cn(text.label, 'flex items-center justify-between')}>
                   <span>Estadísticas Base (BST):</span>
-                  <span className="text-indigo-600 dark:text-indigo-400 font-black">
+                  <span className={cn('font-bold', TONES.info.ink)}>
                     {pokemonData.bst} Total
                   </span>
                 </div>
@@ -430,23 +434,24 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                 <div className="space-y-1.5">
                   {pokemonData.stats.map((s) => (
                     <div key={s.name} className="flex items-center text-xs gap-2">
-                      <span className="w-16 font-bold text-slate-600 dark:text-slate-400 text-[11px]">
+                      <span className={cn(text.meta, 'w-16 font-bold')}>
                         {s.nameEs}:
                       </span>
-                      <span className="w-8 font-black text-slate-900 dark:text-white text-right">
+                      <span className="w-8 font-bold text-brand-txt1 tabular-nums text-right">
                         {s.base}
                       </span>
-                      <div className="flex-1 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                      <div className="flex-1 bg-brand-surface h-2 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all duration-300 ${
+                          className={cn(
+                            'h-full rounded-full transition-all duration-300',
                             s.base >= 110
-                              ? 'bg-emerald-500'
+                              ? TONES.success.fill
                               : s.base >= 80
-                              ? 'bg-blue-500'
+                              ? TONES.info.fill
                               : s.base >= 50
-                              ? 'bg-amber-500'
-                              : 'bg-rose-500'
-                          }`}
+                              ? TONES.warning.fill
+                              : TONES.danger.fill
+                          )}
                           style={{ width: `${s.percent}%` }}
                         />
                       </div>
@@ -458,7 +463,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
               {/* Abilities */}
               {pokemonData.abilities.length > 0 && (
                 <div className="space-y-1.5">
-                  <span className="text-xs font-bold text-slate-400">
+                  <span className={text.label}>
                     Habilidades (Haz clic para ver detalles):
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -467,39 +472,122 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                         key={ab.slug}
                         type="button"
                         onClick={() => onOpenAnother('ability', ab.slug)}
-                        className="px-2.5 py-1 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        className={btn('secondary', 'sm')}
                       >
-                        <Zap className="w-3 h-3 text-amber-500" />
+                        <Zap className={cn('w-3 h-3', TONES.warning.ink)} />
                         <span>{ab.nameEs}</span>
                         {ab.isHidden && (
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-extrabold">
+                          <span className={pill('info', 'xs')}>
                             Oculta
                           </span>
                         )}
-                        <ArrowRight className="w-3 h-3 text-slate-400" />
+                        <ArrowRight className="w-3 h-3 text-brand-txt2" />
                       </button>
                     ))}
                   </div>
                 </div>
+              )}
+
+              {pokemonData.learnset.length > 0 && (
+                <PokemonLearnsetList
+                  learnset={pokemonData.learnset}
+                  onOpenMove={(slug) => onOpenAnother('move', slug)}
+                />
               )}
             </div>
           ) : null}
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs bg-slate-50/50 dark:bg-slate-800/40">
-          <span className="text-[11px] text-slate-400 font-medium">
+        <div className={cn(layout.divider, 'px-5 py-3 bg-brand-surface flex items-center justify-between gap-3')}>
+          <span className={text.meta}>
             Datos obtenidos en tiempo real vía <strong>pokenode-ts</strong> (PokéAPI)
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 font-bold text-slate-800 dark:text-slate-200 transition-colors"
+            className={btn('primary', 'md')}
           >
             Entendido
           </button>
         </div>
       </div>
+    </div>
+  );
+};
+
+const LEARN_TABS: Array<{ key: PokemonLearnMove['method']; label: string }> = [
+  { key: 'level-up', label: 'Por nivel' },
+  { key: 'machine', label: 'MT / MO' },
+  { key: 'egg', label: 'Huevo' },
+  { key: 'tutor', label: 'Tutor' },
+];
+
+const PokemonLearnsetList: React.FC<{
+  learnset: PokemonLearnMove[];
+  onOpenMove: (slug: string) => void;
+}> = ({ learnset, onOpenMove }) => {
+  const availableTabs = LEARN_TABS.filter((tab) => learnset.some((m) => m.method === tab.key));
+  const otherMoves = learnset.filter((m) => m.method === 'other');
+  const defaultTab = availableTabs[0]?.key || 'level-up';
+  const [activeTab, setActiveTab] = React.useState<PokemonLearnMove['method']>(defaultTab);
+
+  React.useEffect(() => {
+    if (!availableTabs.some((tab) => tab.key === activeTab) && defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [activeTab, defaultTab, availableTabs]);
+
+  const visibleMoves = learnset.filter((m) => m.method === activeTab);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className={text.label}>
+          Movimientos que aprende ({learnset.length}):
+        </span>
+        <span className={text.meta}>Clic para potencia y efecto</span>
+      </div>
+
+      {availableTabs.length > 0 && (
+        <div className={cn(segmented.group, 'flex-wrap')}>
+          {availableTabs.map((tab) => {
+            const count = learnset.filter((m) => m.method === tab.key).length;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={segmented.item(isActive)}
+              >
+                {tab.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+        {visibleMoves.map((move) => (
+          <button
+            key={`${move.slug}-${move.method}-${move.level}`}
+            type="button"
+            onClick={() => onOpenMove(move.slug)}
+            className={btn('secondary', 'sm', 'accent', 'justify-start text-left')}
+          >
+            <span className={cn('w-10 shrink-0 text-[10px] font-bold', TONES.info.ink)}>
+              {move.method === 'level-up' ? `Nv.${move.level || 1}` : move.methodEs}
+            </span>
+            <span className="min-w-0 truncate flex-1">{move.nameEs}</span>
+            <TypeBadge type={move.type} />
+          </button>
+        ))}
+      </div>
+
+      {otherMoves.length > 0 && activeTab !== 'other' && (
+        <p className={text.meta}>{otherMoves.length} movimientos adicionales de otras fuentes.</p>
+      )}
     </div>
   );
 };
