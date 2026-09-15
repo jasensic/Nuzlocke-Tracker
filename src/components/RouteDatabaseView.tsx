@@ -4,7 +4,8 @@ import { parsePokemonName, getPokemonSprite } from '../utils/pokemonMeta';
 import { translateWeather, translateMethod } from '../data/routeTranslations';
 import { usePokeDetail } from '../context/PokeDetailContext';
 import { TypeBadge } from './TypeBadge';
-import { Search, MapPin, Wind, Sparkles, Layers, Gamepad2 } from 'lucide-react';
+import { Search, MapPin, Wind, Sparkles, Layers, Gamepad2, Loader2 } from 'lucide-react';
+import { fetchSwordShieldPokedex, toPokeApiSlug, type DexPokemonEntry } from '../services/pokeApiService';
 import {
   cn,
   panel,
@@ -19,6 +20,11 @@ import {
 } from '../utils/ui';
 
 const ALL_ZONES_ID = '__all__';
+
+function tenantUsesSwordShieldDex(tenant?: GameTenant): boolean {
+  if (!tenant) return false;
+  return tenant.id === 'blessed-shield' || /gen\s*8/i.test(tenant.generation);
+}
 
 interface RouteDatabaseViewProps {
   routes: RouteData[];
@@ -52,9 +58,37 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWeather, setSelectedWeather] = useState<string>('All');
   const [selectedMethod, setSelectedMethod] = useState<string>('All');
+  const [dexPokemon, setDexPokemon] = useState<DexPokemonEntry[]>([]);
+  const [dexStatus, setDexStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
+  const usesSwshDex = tenantUsesSwordShieldDex(activeTenant);
   const isAllZones = selectedRouteId === ALL_ZONES_ID;
   const currentRoute = routes.find((r) => r.id === selectedRouteId) || routes[0];
+
+  useEffect(() => {
+    if (!usesSwshDex) {
+      setDexPokemon([]);
+      setDexStatus('idle');
+      return;
+    }
+
+    let cancelled = false;
+    setDexStatus('loading');
+    fetchSwordShieldPokedex()
+      .then((entries) => {
+        if (cancelled) return;
+        setDexPokemon(entries);
+        setDexStatus('ready');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDexStatus('error');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [usesSwshDex]);
 
   const weatherOptions = useMemo(() => {
     if (isAllZones) {
@@ -123,6 +157,46 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
           }
         });
       });
+
+      if (
+        usesSwshDex &&
+        selectedWeather === 'All' &&
+        selectedMethod === 'All'
+      ) {
+        const seenSlugs = new Set(
+          Array.from(unique.values()).map((row) => {
+            const meta = parsePokemonName(row.pokemon);
+            return toPokeApiSlug(meta.apiName || row.cleanName);
+          })
+        );
+        const seenNames = new Set(
+          Array.from(unique.values()).map((row) => row.cleanName.toLowerCase())
+        );
+
+        dexPokemon.forEach((entry) => {
+          const meta = parsePokemonName(entry.name);
+          const slug = toPokeApiSlug(meta.apiName || entry.slug);
+          const nameKey = meta.cleanName.toLowerCase();
+          if (seenSlugs.has(slug) || seenSlugs.has(entry.slug) || seenNames.has(nameKey)) {
+            return;
+          }
+          if (term && !entry.name.toLowerCase().includes(term) && !nameKey.includes(term)) {
+            return;
+          }
+          seenSlugs.add(slug);
+          seenNames.add(nameKey);
+          unique.set(`dex-${entry.slug}`, {
+            key: `dex-${entry.slug}`,
+            pokemon: entry.name,
+            cleanName: meta.cleanName,
+            methods: [],
+            weather: 'Pokédex Galar',
+            routeName: 'Pokédex Galar',
+            routeNames: ['Pokédex Galar (SwSh)'],
+          });
+        });
+      }
+
       return Array.from(unique.values()).sort((a, b) => a.cleanName.localeCompare(b.cleanName, 'es'));
     }
 
@@ -136,7 +210,7 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
       weather: enc.weather,
       routeName: currentRoute.name,
     }));
-  }, [isAllZones, routes, currentRoute, searchTerm, selectedWeather, selectedMethod]);
+  }, [isAllZones, routes, currentRoute, searchTerm, selectedWeather, selectedMethod, usesSwshDex, dexPokemon]);
 
   return (
     <div id="route-database-view" className={layout.view}>
@@ -164,6 +238,9 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
             </div>
             <p className={text.muted}>
               Consulta las tablas completas de encuentros, niveles, métodos y porcentajes para {activeTenant?.name || 'este juego'}. Haz clic en un Pokémon para ver habilidades y movimientos.
+              {usesSwshDex && isAllZones && (
+                <> También se incluye el Pokédex de Galar + DLC (Isla de la Armadura y Corona Nevada), no solo los salvajes de ruta.</>
+              )}
             </p>
           </div>
 
@@ -266,7 +343,16 @@ export const RouteDatabaseView: React.FC<RouteDatabaseViewProps> = ({
             {isAllZones ? 'Todos los Pokémon del juego' : `Tabla de Encuentros de ${currentRoute?.name || ''}`}
           </h3>
           <span className={pill('neutral', 'md', 'shrink-0 tabular-nums')}>
-            {filteredEncounters.length} {isAllZones ? 'Pokémon únicos' : 'registros encontrados'}
+            {dexStatus === 'loading' && usesSwshDex && isAllZones ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Cargando Pokédex Galar…
+              </span>
+            ) : (
+              <>
+                {filteredEncounters.length} {isAllZones ? 'Pokémon únicos' : 'registros encontrados'}
+              </>
+            )}
           </span>
         </div>
 

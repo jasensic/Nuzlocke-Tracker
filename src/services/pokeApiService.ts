@@ -8,6 +8,7 @@ import {
   getItemInfo,
   getMoveInfo,
 } from '../data/trainers/trainerTranslations';
+import { parsePokemonName } from '../utils/pokemonMeta';
 
 // ==========================================
 // POKENODE-TS OFFICIAL CACHE SETUP
@@ -34,6 +35,124 @@ export const mainClient = new MainClient({
 export const pokemonClient = mainClient.pokemon;
 export const moveClient = mainClient.move;
 export const itemClient = mainClient.item;
+export const gameClient = mainClient.game;
+export const evolutionClient = mainClient.evolution;
+
+/** Pokédexes that make up Sword/Shield + both DLCs (Blessed Shield). */
+const SWSH_POKEDEX_NAMES = ['galar', 'isle-of-armor', 'crown-tundra'] as const;
+
+export interface DexPokemonEntry {
+  slug: string;
+  name: string;
+}
+
+const DEX_DISPLAY_OVERRIDES: Record<string, string> = {
+  'nidoran-f': 'Nidoran♀',
+  'nidoran-m': 'Nidoran♂',
+  'mr-mime': 'Mr. Mime',
+  'mime-jr': 'Mime Jr.',
+  'mr-rime': 'Mr. Rime',
+  'type-null': 'Type: Null',
+  'porygon-z': 'Porygon-Z',
+  'porygon2': 'Porygon2',
+  'jangmo-o': 'Jangmo-o',
+  'hakamo-o': 'Hakamo-o',
+  'kommo-o': 'Kommo-o',
+  'tapu-koko': 'Tapu Koko',
+  'tapu-lele': 'Tapu Lele',
+  'tapu-bulu': 'Tapu Bulu',
+  'tapu-fini': 'Tapu Fini',
+  'ho-oh': 'Ho-Oh',
+  farfetchd: "Farfetch'd",
+  sirfetchd: "Sirfetch'd",
+  flabebe: 'Flabébé',
+};
+
+/** Regional / alternate forms present in SwSh that Pokédex species entries collapse. */
+const SWSH_EXTRA_FORMS = [
+  'Zigzagoon-1',
+  'Meowth-1',
+  'Meowth-2',
+  'Persian-1',
+  "Farfetch'd-1",
+  'Darumaka-1',
+  'Darmanitan-2',
+  'Mr. Mime-1',
+  'Corsola-1',
+  'Slowpoke-1',
+  'Ponyta-1',
+  'Rapidash-1',
+  'Weezing-1',
+  'Yamask-1',
+  'Stunfisk-1',
+  'Vulpix-1',
+  'Ninetales-1',
+  'Sandshrew-1',
+  'Sandslash-1',
+  'Dugtrio-1',
+  'Indeedee-1',
+  'Basculin-1',
+  'Lycanroc Day',
+  'Lycanroc Night',
+  'Lycanroc Dusk',
+  'Toxtricity-Low-Key',
+];
+
+function titleCaseSlug(slug: string): string {
+  if (DEX_DISPLAY_OVERRIDES[slug]) return DEX_DISPLAY_OVERRIDES[slug];
+  return slug
+    .split('-')
+    .map((word) => (word.length ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(' ');
+}
+
+function dexEntryFromName(name: string): DexPokemonEntry {
+  const meta = parsePokemonName(name);
+  const slug = toPokeApiSlug(meta.apiName);
+  return { slug: POKEMON_SLUG_OVERRIDES[slug] || slug, name: meta.displayName };
+}
+
+let swshDexPromise: Promise<DexPokemonEntry[]> | null = null;
+
+/**
+ * Full Sword/Shield available species: Galar + Isle of Armor + Crown Tundra.
+ * Generation-viii alone only returns the ~90 new Galar Pokémon and misses
+ * every transferred species Blessed Shield actually uses.
+ */
+export function fetchSwordShieldPokedex(): Promise<DexPokemonEntry[]> {
+  if (!swshDexPromise) {
+    swshDexPromise = loadSwordShieldPokedex().catch((err) => {
+      swshDexPromise = null;
+      throw err;
+    });
+  }
+  return swshDexPromise;
+}
+
+async function loadSwordShieldPokedex(): Promise<DexPokemonEntry[]> {
+  const unique = new Map<string, DexPokemonEntry>();
+
+  const dexes = await Promise.all(
+    SWSH_POKEDEX_NAMES.map((dexName) => gameClient.getPokedexByName(dexName))
+  );
+
+  for (const dex of dexes) {
+    for (const entry of dex.pokemon_entries || []) {
+      const slug = entry.pokemon_species?.name;
+      if (!slug || unique.has(slug)) continue;
+      unique.set(slug, { slug, name: titleCaseSlug(slug) });
+    }
+  }
+
+  for (const formName of SWSH_EXTRA_FORMS) {
+    const extra = dexEntryFromName(formName);
+    if (!unique.has(extra.slug)) {
+      unique.set(extra.slug, extra);
+    }
+  }
+
+  return Array.from(unique.values()).sort((a, b) => a.name.localeCompare(b.name, 'en'));
+}
 
 // ==========================================
 // TYPE DEFINITIONS FOR DETAIL MODAL
@@ -96,6 +215,16 @@ export interface PokemonLearnMove {
   methodEs: string;
 }
 
+export interface PokemonEvolution {
+  slug: string;
+  name: string;
+  sprite: string;
+  fromName: string;
+  stage: number;
+  requirement: string;
+  itemSlug?: string;
+}
+
 export interface PokemonDetail {
   id: number;
   slug: string;
@@ -114,6 +243,7 @@ export interface PokemonDetail {
   stats: PokemonStat[];
   bst: number;
   learnset: PokemonLearnMove[];
+  evolutions: PokemonEvolution[];
 }
 
 // Translations mapping
@@ -263,6 +393,316 @@ const POKEMON_SLUG_OVERRIDES: Record<string, string> = {
   'duraludon-gmax': 'duraludon-gmax',
   'centiskorch-gmax': 'centiskorch-gmax',
 };
+
+export function getPokemonApiSlug(rawName: string): string {
+  const parsed = parsePokemonName(rawName);
+  const candidates = [parsed.apiName, rawName, parsed.cleanName];
+  for (const candidate of candidates) {
+    const slug = toPokeApiSlug(candidate);
+    if (!slug) continue;
+    if (POKEMON_SLUG_OVERRIDES[slug]) return POKEMON_SLUG_OVERRIDES[slug];
+  }
+  const fallback = toPokeApiSlug(parsed.apiName || rawName);
+  return POKEMON_SLUG_OVERRIDES[fallback] || fallback;
+}
+
+const GEN8_VERSION_GROUPS = new Set(['sword-shield', 'the-isle-of-armor', 'the-crown-tundra']);
+const POST_GEN8_VERSION_GROUPS = new Set([
+  'legends-arceus',
+  'scarlet-violet',
+  'the-teal-mask',
+  'the-indigo-disk',
+]);
+
+const EVOLUTION_ITEM_ES: Record<string, string> = {
+  'fire-stone': 'Piedra Fuego',
+  'water-stone': 'Piedra Agua',
+  'thunder-stone': 'Piedra Trueno',
+  'leaf-stone': 'Piedra Hoja',
+  'moon-stone': 'Piedra Lunar',
+  'sun-stone': 'Piedra Solar',
+  'shiny-stone': 'Piedra Día',
+  'dusk-stone': 'Piedra Noche',
+  'dawn-stone': 'Piedra Alba',
+  'ice-stone': 'Piedra Hielo',
+  'oval-stone': 'Piedra Oval',
+  'tart-apple': 'Manzana Ácida',
+  'sweet-apple': 'Manzana Dulce',
+  'cracked-pot': 'Tetera Agrietada',
+  'chipped-pot': 'Tetera Rota',
+  'galarica-cuff': 'Brazal Galanuez',
+  'galarica-wreath': 'Corona Galanuez',
+  'metal-coat': 'Revestimiento Metálico',
+  'kings-rock': 'Roca del Rey',
+  'dragon-scale': 'Escama Dragón',
+  protector: 'Protector',
+  electirizer: 'Electrizador',
+  magmarizer: 'Magmatizador',
+  'reaper-cloth': 'Tela Terrible',
+  upgrade: 'Mejora',
+  'dubious-disc': 'Disco Extraño',
+  'razor-claw': 'Garra Afilada',
+  'razor-fang': 'Colmillo Agudo',
+  'prism-scale': 'Escama Bella',
+  sachet: 'Saquito Fragante',
+  'whipped-dream': 'Dulce de Nata',
+  'strawberry-sweet': 'Confite Fresa',
+  'berry-sweet': 'Confite Fruto',
+  'love-sweet': 'Confite Corazón',
+  'star-sweet': 'Confite Estrella',
+  'clover-sweet': 'Confite Trébol',
+  'flower-sweet': 'Confite Flor',
+  'ribbon-sweet': 'Confite Lazo',
+  'scroll-of-darkness': 'Pergamino Oscuro',
+  'scroll-of-waters': 'Pergamino Acuático',
+};
+
+interface EvolutionDetailLike {
+  trigger?: { name: string } | null;
+  item?: { name: string } | null;
+  held_item?: { name: string } | null;
+  known_move?: { name: string } | null;
+  known_move_type?: { name: string } | null;
+  location?: { name: string } | null;
+  gender?: number | null;
+  min_level?: number | null;
+  min_happiness?: number | null;
+  min_beauty?: number | null;
+  min_affection?: number | null;
+  needs_overworld_rain?: boolean;
+  party_species?: { name: string } | null;
+  party_type?: { name: string } | null;
+  relative_physical_stats?: number | null;
+  time_of_day?: string;
+  trade_species?: { name: string } | null;
+  turn_upside_down?: boolean;
+  version_group?: { name: string } | null;
+  is_default?: boolean;
+  base_form?: { name: string; url: string } | null;
+  evolved_form?: { name: string; url: string } | null;
+}
+
+interface ChainLinkLike {
+  species: { name: string; url: string };
+  evolution_details: EvolutionDetailLike[];
+  evolves_to: ChainLinkLike[];
+}
+
+function resourceIdFromUrl(url?: string): number | null {
+  if (!url) return null;
+  const match = url.match(/\/(\d+)\/?$/);
+  return match ? Number(match[1]) : null;
+}
+
+function formRegion(slug?: string | null): 'galar' | 'alola' | 'hisui' | 'paldea' | null {
+  if (!slug) return null;
+  if (slug.includes('galar')) return 'galar';
+  if (slug.includes('alola')) return 'alola';
+  if (slug.includes('hisui')) return 'hisui';
+  if (slug.includes('paldea')) return 'paldea';
+  return null;
+}
+
+function evolutionItemLabel(slug: string): string {
+  if (EVOLUTION_ITEM_ES[slug]) return EVOLUTION_ITEM_ES[slug];
+  const english = slugToEnglishMoveName(slug);
+  const local = getItemInfo(english);
+  if (local.name && local.name !== 'Ninguno') return local.name;
+  return english;
+}
+
+function formatEvolutionRequirement(detail: EvolutionDetailLike): { text: string; itemSlug?: string } {
+  const parts: string[] = [];
+  const trigger = detail.trigger?.name || '';
+  const itemSlug = detail.item?.name || undefined;
+  const heldSlug = detail.held_item?.name || undefined;
+
+  if (detail.min_level) parts.push(`Nivel ${detail.min_level}`);
+
+  if (trigger === 'trade') {
+    if (heldSlug) parts.push(`Intercambio con ${evolutionItemLabel(heldSlug)} equipado`);
+    else if (detail.trade_species?.name) parts.push(`Intercambio por ${titleCaseSlug(detail.trade_species.name)}`);
+    else parts.push('Intercambio');
+  } else if (trigger === 'use-item' && itemSlug) {
+    parts.push(`Usar ${evolutionItemLabel(itemSlug)}`);
+  } else if (trigger === 'shed') {
+    parts.push('Hueco libre en el equipo y una Poké Ball al evolucionar a Ninjask');
+  } else if (trigger === 'three-critical-hits') {
+    parts.push('Asestar 3 golpes críticos en un mismo combate');
+  } else if (trigger === 'take-damage') {
+    parts.push('Recibir al menos 49 PS de daño sin debilitarte y pasar bajo el Arco de la Llanura');
+  } else if (trigger === 'tower-of-darkness') {
+    parts.push('Torre de las Tinieblas (Pergamino Oscuro)');
+  } else if (trigger === 'tower-of-waters') {
+    parts.push('Torre de las Aguas (Pergamino Acuático)');
+  } else if (trigger === 'spin') {
+    parts.push('Girar en el sitio con un Confite equipado');
+  }
+
+  if (detail.gender === 1) parts.push('Solo hembras');
+  if (detail.gender === 2) parts.push('Solo machos');
+  if (heldSlug && trigger !== 'trade') parts.push(`Con ${evolutionItemLabel(heldSlug)} equipado`);
+  if (detail.known_move?.name) {
+    const moveEn = slugToEnglishMoveName(detail.known_move.name);
+    const moveInfo = getMoveInfo(moveEn);
+    parts.push(`Conociendo ${moveInfo.spanishName || moveEn}`);
+  }
+  if (detail.known_move_type?.name) {
+    parts.push(`Conociendo un movimiento de tipo ${TYPE_TRANSLATIONS[detail.known_move_type.name] || detail.known_move_type.name}`);
+  }
+  if (detail.min_happiness) parts.push('Amistad alta');
+  if (detail.min_affection) parts.push('Cariño alto');
+  if (detail.min_beauty) parts.push('Belleza máxima');
+  if (detail.time_of_day === 'day') parts.push('De día');
+  if (detail.time_of_day === 'night') parts.push('De noche');
+  if (detail.time_of_day === 'dusk') parts.push('Al atardecer');
+  if (detail.needs_overworld_rain) parts.push('Con lluvia en el mapa');
+  if (detail.turn_upside_down) parts.push('Consola invertida');
+  if (detail.relative_physical_stats === 1) parts.push('Ataque > Defensa');
+  if (detail.relative_physical_stats === 0) parts.push('Ataque = Defensa');
+  if (detail.relative_physical_stats === -1) parts.push('Ataque < Defensa');
+  if (detail.party_species?.name) parts.push(`Con ${titleCaseSlug(detail.party_species.name)} en el equipo`);
+  if (detail.party_type?.name) {
+    parts.push(`Con un Pokémon de tipo ${TYPE_TRANSLATIONS[detail.party_type.name] || detail.party_type.name} en el equipo`);
+  }
+  if (detail.location?.name) parts.push(`En ${titleCaseSlug(detail.location.name)}`);
+
+  if (trigger === 'level-up' && !detail.min_level) {
+    parts.unshift('Subir de nivel');
+  }
+
+  const unique = parts.filter((part, index) => parts.indexOf(part) === index);
+  return {
+    text: unique.length ? unique.join(' · ') : 'Condición especial de 8.ª generación',
+    itemSlug: itemSlug || heldSlug,
+  };
+}
+
+function matchesCurrentForm(_details: EvolutionDetailLike[], currentSlug: string, detail: EvolutionDetailLike): boolean {
+  const currentRegion = formRegion(currentSlug);
+  const baseRegion = formRegion(detail.base_form?.name);
+  const evoRegion = formRegion(detail.evolved_form?.name);
+
+  if (currentRegion) {
+    if (baseRegion || evoRegion) {
+      return baseRegion === currentRegion || evoRegion === currentRegion;
+    }
+    return false;
+  }
+
+  return !baseRegion && !evoRegion;
+}
+
+function pickGen8EvolutionDetails(details: EvolutionDetailLike[], currentSlug: string): EvolutionDetailLike[] {
+  const formMatched = details.filter((d) => matchesCurrentForm(details, currentSlug, d));
+  const currentRegion = formRegion(currentSlug);
+  if (!formMatched.length) {
+    if (currentRegion) return [];
+    const allRegional = details.every(
+      (d) => formRegion(d.base_form?.name) || formRegion(d.evolved_form?.name)
+    );
+    if (allRegional) return [];
+  }
+  const pool = formMatched.length ? formMatched : details;
+  const allowed = pool.filter((d) => {
+    const group = d.version_group?.name;
+    if (group && POST_GEN8_VERSION_GROUPS.has(group)) return false;
+    return true;
+  });
+
+  const gen8 = allowed.filter((d) => d.version_group?.name && GEN8_VERSION_GROUPS.has(d.version_group.name));
+  const chosen = gen8.length ? gen8 : allowed.filter((d) => d.is_default !== false);
+  const finalDetails = chosen.length ? chosen : allowed;
+
+  const seen = new Set<string>();
+  return finalDetails.filter((d) => {
+    const key = [
+      d.trigger?.name,
+      d.item?.name,
+      d.held_item?.name,
+      d.min_level,
+      d.min_happiness,
+      d.known_move?.name,
+      d.known_move_type?.name,
+      d.time_of_day,
+      d.gender,
+    ].join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function evolutionSpriteUrl(detail: EvolutionDetailLike, speciesUrl: string): string {
+  const id =
+    resourceIdFromUrl(detail.evolved_form?.url) ||
+    resourceIdFromUrl(speciesUrl) ||
+    0;
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+}
+
+function findChainNode(node: ChainLinkLike, speciesName: string): ChainLinkLike | null {
+  if (node.species.name === speciesName) return node;
+  for (const child of node.evolves_to || []) {
+    const found = findChainNode(child, speciesName);
+    if (found) return found;
+  }
+  return null;
+}
+
+async function getPokemonEvolutions(speciesName: string, pokemonSlug: string): Promise<PokemonEvolution[]> {
+  try {
+    const species = await pokemonClient.getPokemonSpeciesByName(speciesName);
+    const chainId = resourceIdFromUrl(species.evolution_chain?.url);
+    if (!chainId) return [];
+
+    const chain = await evolutionClient.getEvolutionChainById(chainId);
+    const root = chain.chain as ChainLinkLike;
+    const start = findChainNode(root, speciesName);
+    if (!start) return [];
+
+    const dex = await fetchSwordShieldPokedex().catch(() => [] as DexPokemonEntry[]);
+    const dexSlugs = new Set(dex.map((entry) => entry.slug));
+    const inSwsh = (slug: string, speciesSlug: string) => {
+      if (!dexSlugs.size) return true;
+      return dexSlugs.has(slug) || dexSlugs.has(speciesSlug);
+    };
+
+    const results: PokemonEvolution[] = [];
+
+    const walk = (node: ChainLinkLike, currentSlug: string, fromDisplay: string, stage: number) => {
+      for (const next of node.evolves_to || []) {
+        const details = pickGen8EvolutionDetails(next.evolution_details || [], currentSlug);
+        if (!details.length) continue;
+
+        const targetSlug = details[0].evolved_form?.name || next.species.name;
+        if (!inSwsh(targetSlug, next.species.name)) continue;
+
+        const formatted = details.map((d) => formatEvolutionRequirement(d));
+        const requirement = formatted.map((f) => f.text).filter((text, i, all) => all.indexOf(text) === i).join('  · o ·  ');
+        const itemSlug = formatted.find((f) => f.itemSlug)?.itemSlug;
+        const displayName = titleCaseSlug(targetSlug);
+
+        results.push({
+          slug: targetSlug,
+          name: displayName,
+          sprite: evolutionSpriteUrl(details[0], next.species.url),
+          fromName: fromDisplay,
+          stage,
+          requirement,
+          itemSlug,
+        });
+
+        walk(next, targetSlug, displayName, stage + 1);
+      }
+    };
+
+    walk(start, pokemonSlug, titleCaseSlug(pokemonSlug), 1);
+    return results;
+  } catch {
+    return [];
+  }
+}
 
 // ==========================================
 // 1. FETCH MOVE DETAILS
@@ -474,21 +914,30 @@ export async function getItemDetails(itemNameOrSlug: string): Promise<ItemDetail
 // 4. FETCH POKEMON DETAILS
 // ==========================================
 export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<PokemonDetail> {
-  const baseSlug = toPokeApiSlug(pokemonNameOrSlug);
-  const normalized = POKEMON_SLUG_OVERRIDES[baseSlug] || baseSlug;
+  const parsed = parsePokemonName(pokemonNameOrSlug);
+  const baseSlug = toPokeApiSlug(parsed.apiName || pokemonNameOrSlug);
+  const normalized = getPokemonApiSlug(pokemonNameOrSlug);
 
   try {
     let pokemon;
     try {
       pokemon = await pokemonClient.getPokemonByName(normalized);
     } catch {
-      // Fallback: try base slug without regional suffix if standard failed
-      if (normalized.includes('-')) {
-        const root = normalized.split('-')[0];
-        pokemon = await pokemonClient.getPokemonByName(root);
-      } else {
-        throw new Error('Not found');
+      const fallbacks = [toPokeApiSlug(parsed.apiName), toPokeApiSlug(parsed.cleanName), baseSlug]
+        .map((slug) => POKEMON_SLUG_OVERRIDES[slug] || slug)
+        .filter((slug, index, all) => slug && slug !== normalized && all.indexOf(slug) === index);
+
+      let found = null;
+      for (const slug of fallbacks) {
+        try {
+          found = await pokemonClient.getPokemonByName(slug);
+          break;
+        } catch {
+          // Try next candidate
+        }
       }
+      if (!found) throw new Error('Not found');
+      pokemon = found;
     }
 
     const types = pokemon.types.map((t) => {
@@ -587,6 +1036,11 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       return a.nameEs.localeCompare(b.nameEs, 'es');
     });
 
+    const evolutions = await getPokemonEvolutions(
+      pokemon.species?.name || pokemon.name,
+      pokemon.name
+    );
+
     const result: PokemonDetail = {
       id: pokemon.id,
       slug: normalized,
@@ -605,6 +1059,7 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       stats,
       bst,
       learnset,
+      evolutions,
     };
 
     return result;
@@ -628,6 +1083,7 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       stats: [],
       bst: 0,
       learnset: [],
+      evolutions: [],
     };
     return result;
   }

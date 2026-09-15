@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { PokeDetailRequest, DetailType } from '../context/PokeDetailContext';
+import React, { useState, useEffect, useRef } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import type { PokeDetailRequest, DetailType, DetailNavDirection } from '../context/PokeDetailContext';
 import {
   getMoveDetails,
   getAbilityDetails,
@@ -9,6 +10,7 @@ import {
   AbilityDetail,
   ItemDetail,
   PokemonDetail,
+  PokemonEvolution,
 } from '../services/pokeApiService';
 import { TypeBadge } from './TypeBadge';
 import { PokemonLearnMove } from '../services/pokeApiService';
@@ -22,7 +24,6 @@ import {
   statTile,
   iconTile,
   text,
-  surface,
   layout,
   segmented,
   spriteFrame,
@@ -38,35 +39,72 @@ import {
   Gauge,
   Swords,
   Info,
+  ArrowLeft,
   ArrowRight,
   Scale,
   Ruler,
   AlertCircle,
   Loader2,
+  GitBranch,
 } from 'lucide-react';
 
 interface PokeDetailModalProps {
   request: PokeDetailRequest;
+  previousRequest?: PokeDetailRequest | null;
+  navDirection: DetailNavDirection;
   onClose: () => void;
+  onBack: () => void;
+  canGoBack: boolean;
   onOpenAnother: (type: DetailType, name: string) => void;
 }
 
+const DETAIL_KIND_LABEL: Record<DetailType, string> = {
+  pokemon: 'Pokémon',
+  ability: 'habilidad',
+  item: 'objeto',
+  move: 'movimiento',
+};
+
+const contentVariants = {
+  enter: (direction: DetailNavDirection) => ({
+    x: direction * 28,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: DetailNavDirection) => ({
+    x: direction * -28,
+    opacity: 0,
+  }),
+};
+
 export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
   request,
+  previousRequest,
+  navDirection,
   onClose,
+  onBack,
+  canGoBack,
   onOpenAnother,
 }) => {
   const { type, name } = request;
+  const reduceMotion = useReducedMotion();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [moveData, setMoveData] = useState<MoveDetail | null>(null);
   const [abilityData, setAbilityData] = useState<AbilityDetail | null>(null);
   const [itemData, setItemData] = useState<ItemDetail | null>(null);
   const [pokemonData, setPokemonData] = useState<PokemonDetail | null>(null);
+  const [viewType, setViewType] = useState<DetailType>(type);
+  const [viewName, setViewName] = useState(name);
+  const hasContentRef = useRef(false);
 
-  // Close on escape key
+  // Escape closes the whole stack; browser Back walks one step at a time.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -75,37 +113,63 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // Fetch from pokenode-ts
+  // Fetch from pokenode-ts. Keep the previous ficha visible until the next one is ready.
   useEffect(() => {
     let isCancelled = false;
-    setIsLoading(true);
     setError(null);
-    setMoveData(null);
-    setAbilityData(null);
-    setItemData(null);
-    setPokemonData(null);
+    if (!hasContentRef.current) {
+      setIsLoading(true);
+    } else {
+      setIsFetching(true);
+    }
 
     async function fetchData() {
       try {
         if (type === 'move') {
           const res = await getMoveDetails(name);
-          if (!isCancelled) setMoveData(res);
+          if (isCancelled) return;
+          setMoveData(res);
+          setAbilityData(null);
+          setItemData(null);
+          setPokemonData(null);
         } else if (type === 'ability') {
           const res = await getAbilityDetails(name);
-          if (!isCancelled) setAbilityData(res);
+          if (isCancelled) return;
+          setAbilityData(res);
+          setMoveData(null);
+          setItemData(null);
+          setPokemonData(null);
         } else if (type === 'item') {
           const res = await getItemDetails(name);
-          if (!isCancelled) setItemData(res);
+          if (isCancelled) return;
+          setItemData(res);
+          setMoveData(null);
+          setAbilityData(null);
+          setPokemonData(null);
         } else if (type === 'pokemon') {
           const res = await getPokemonDetails(name);
-          if (!isCancelled) setPokemonData(res);
+          if (isCancelled) return;
+          setPokemonData(res);
+          setMoveData(null);
+          setAbilityData(null);
+          setItemData(null);
+        }
+        if (!isCancelled) {
+          setViewType(type);
+          setViewName(name);
+          hasContentRef.current = true;
         }
       } catch (err: any) {
         if (!isCancelled) {
           setError(err?.message || 'No se pudo cargar la información desde PokéAPI.');
+          setViewType(type);
+          setViewName(name);
         }
       } finally {
-        if (!isCancelled) setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+          setIsFetching(false);
+        }
       }
     }
 
@@ -117,33 +181,69 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
   }, [type, name]);
 
   const typeConfig: { title: string; icon: typeof Swords; tone: Tone } =
-    type === 'move'
+    viewType === 'move'
       ? { title: 'Detalles del Movimiento', icon: Swords, tone: 'danger' }
-      : type === 'ability'
+      : viewType === 'ability'
       ? { title: 'Detalles de la Habilidad', icon: Zap, tone: 'warning' }
-      : type === 'item'
+      : viewType === 'item'
       ? { title: 'Detalles del Objeto', icon: Shield, tone: 'info' }
       : { title: 'Detalles del Pokémon', icon: Sparkles, tone: 'success' };
 
+  const motionTransition = reduceMotion
+    ? { duration: 0 }
+    : { type: 'spring' as const, damping: 28, stiffness: 340, mass: 0.9 };
+  const contentTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
+
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
-      className={surface.overlay}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-brand-bg/70 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.2 }}
       onClick={onClose}
     >
-      <div
-        className={cn(surface.modal, 'max-w-2xl')}
+      <motion.div
+        className="relative w-full max-w-2xl bg-brand-card border border-brand-border rounded-xl overflow-hidden"
+        initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={reduceMotion ? undefined : { opacity: 0, y: 10, scale: 0.98 }}
+        transition={motionTransition}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top Bar */}
         <div className="px-5 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={iconTile(typeConfig.tone)}>
-              <typeConfig.icon className="w-5 h-5" />
-            </div>
-            <div>
+          <div className="flex items-center gap-3 min-w-0">
+            {canGoBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                className={iconBtn('ghost', 'md')}
+                title={
+                  previousRequest
+                    ? `Volver a ${previousRequest.name}`
+                    : 'Volver atrás'
+                }
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            ) : (
+              <div className={iconTile(typeConfig.tone)}>
+                <typeConfig.icon className="w-5 h-5" />
+              </div>
+            )}
+            <div className="min-w-0">
               <h3 className={text.sectionTitle}>{typeConfig.title}</h3>
+              {canGoBack && previousRequest && (
+                <p className={cn(text.meta, 'truncate')}>
+                  Volver a {DETAIL_KIND_LABEL[previousRequest.type]}:{' '}
+                  <strong className="capitalize">{previousRequest.name}</strong>
+                </p>
+              )}
             </div>
           </div>
 
@@ -158,7 +258,32 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className={cn(layout.divider, 'p-5 max-h-[80vh] overflow-y-auto space-y-4')}>
+        <div className={cn(layout.divider, 'relative overflow-hidden')}>
+          {isFetching && (
+            <div className="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-brand-surface">
+              <motion.div
+                className={cn('h-full w-1/3 rounded-full', TONES.info.fill)}
+                initial={{ x: '-100%' }}
+                animate={{ x: '350%' }}
+                transition={
+                  reduceMotion
+                    ? { duration: 0 }
+                    : { duration: 0.9, repeat: Infinity, ease: 'easeInOut' }
+                }
+              />
+            </div>
+          )}
+          <AnimatePresence mode="wait" initial={false} custom={navDirection}>
+            <motion.div
+              key={`${viewType}-${viewName}`}
+              custom={navDirection}
+              variants={reduceMotion ? undefined : contentVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={contentTransition}
+              className="p-5 max-h-[80vh] overflow-y-auto space-y-4"
+            >
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-3">
               <Loader2 className={cn('w-8 h-8 animate-spin', TONES.info.ink)} />
@@ -174,7 +299,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
               </div>
               <p className="text-xs">{error}</p>
             </div>
-          ) : type === 'move' && moveData ? (
+          ) : viewType === 'move' && moveData ? (
             /* ================= MOVE VIEW ================= */
             <div className="space-y-4">
               {/* Header Title & Types */}
@@ -285,7 +410,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                 </div>
               )}
             </div>
-          ) : type === 'ability' && abilityData ? (
+          ) : viewType === 'ability' && abilityData ? (
             /* ================= ABILITY VIEW ================= */
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-2">
@@ -326,7 +451,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                 </div>
               )}
             </div>
-          ) : type === 'item' && itemData ? (
+          ) : viewType === 'item' && itemData ? (
             /* ================= ITEM VIEW ================= */
             <div className="space-y-4">
               <div className="flex items-center gap-3.5">
@@ -376,7 +501,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                 </div>
               )}
             </div>
-          ) : type === 'pokemon' && pokemonData ? (
+          ) : viewType === 'pokemon' && pokemonData ? (
             /* ================= POKEMON VIEW ================= */
             <div className="space-y-4">
               {/* Header: Artwork, Name, Types */}
@@ -488,6 +613,17 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                 </div>
               )}
 
+              <PokemonEvolutionList
+                current={{
+                  slug: pokemonData.slug,
+                  name: pokemonData.displayName,
+                  sprite: pokemonData.sprites.artwork,
+                }}
+                evolutions={pokemonData.evolutions}
+                onOpenPokemon={(slug) => onOpenAnother('pokemon', slug)}
+                onOpenItem={(slug) => onOpenAnother('item', slug)}
+              />
+
               {pokemonData.learnset.length > 0 && (
                 <PokemonLearnsetList
                   learnset={pokemonData.learnset}
@@ -496,6 +632,8 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
               )}
             </div>
           ) : null}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Modal Footer */}
@@ -503,15 +641,156 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
           <span className={text.meta}>
             Datos obtenidos en tiempo real vía <strong>pokenode-ts</strong> (PokéAPI)
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className={btn('primary', 'md')}
-          >
-            Entendido
-          </button>
+          <div className="flex items-center gap-2">
+            {canGoBack && (
+              <button type="button" onClick={onBack} className={btn('secondary', 'md')}>
+                <ArrowLeft className="w-4 h-4" />
+                Atrás
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className={btn('primary', 'md')}
+            >
+              Entendido
+            </button>
+          </div>
         </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+type EvolutionNode = {
+  slug: string;
+  name: string;
+  sprite: string;
+};
+
+function groupEvolutionBranches(evolutions: PokemonEvolution[]): PokemonEvolution[][] {
+  const roots = evolutions.filter((evo) => evo.stage === 1);
+  return roots.map((root) => {
+    const branch = [root];
+    let fromName = root.name;
+    for (const evo of evolutions) {
+      if (evo.stage <= 1) continue;
+      if (evo.fromName === fromName) {
+        branch.push(evo);
+        fromName = evo.name;
+      }
+    }
+    return branch;
+  });
+}
+
+const EvolutionSpriteButton: React.FC<{
+  node: EvolutionNode;
+  current?: boolean;
+  onOpen: (slug: string) => void;
+}> = ({ node, current, onOpen }) => (
+  <button
+    type="button"
+    onClick={() => onOpen(node.slug)}
+    className="flex w-[4.75rem] shrink-0 flex-col items-center gap-1 text-center"
+    title={node.name}
+  >
+    <div className={spriteFrame(false, current ? 'w-12 h-12 p-1 ring-1 ring-brand-accent/40' : 'w-12 h-12 p-1')}>
+      <img src={node.sprite} alt={node.name} className="h-full w-full object-contain" loading="lazy" />
+    </div>
+    <span className={cn(text.meta, 'w-full truncate font-semibold text-brand-txt1')}>{node.name}</span>
+  </button>
+);
+
+const EvolutionArrow: React.FC<{
+  requirement: string;
+  itemSlug?: string;
+  onOpenItem: (slug: string) => void;
+}> = ({ requirement, itemSlug, onOpenItem }) => (
+  <div className="flex min-w-[5.5rem] max-w-[7.5rem] shrink-0 flex-col items-center justify-center gap-0.5 px-1 pt-2">
+    <ArrowRight className={cn('h-4 w-4', TONES.success.ink)} />
+    <p className={cn(text.meta, 'text-center leading-tight')}>{requirement}</p>
+    {itemSlug && (
+      <button
+        type="button"
+        onClick={() => onOpenItem(itemSlug)}
+        className={btn('soft', 'xs', 'info')}
+        title="Ver objeto"
+      >
+        Objeto
+      </button>
+    )}
+  </div>
+);
+
+const PokemonEvolutionList: React.FC<{
+  current: EvolutionNode;
+  evolutions: PokemonEvolution[];
+  onOpenPokemon: (slug: string) => void;
+  onOpenItem: (slug: string) => void;
+}> = ({ current, evolutions, onOpenPokemon, onOpenItem }) => {
+  const branches = groupEvolutionBranches(evolutions);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className={cn(text.label, 'flex items-center gap-1.5')}>
+          <GitBranch className={cn('w-3.5 h-3.5', TONES.success.ink)} />
+          Evoluciones (8.ª gen.):
+        </span>
+        {evolutions.length > 0 && (
+          <span className={text.meta}>Clic para ver datos</span>
+        )}
       </div>
+
+      {evolutions.length === 0 ? (
+        <p className={cn(text.muted, 'px-1')}>
+          Este Pokémon no evoluciona más en Espada/Escudo.
+        </p>
+      ) : (
+        <div className={card({ padding: 'none', extra: 'overflow-x-auto p-3' })}>
+          <div className="flex min-w-full justify-center">
+            <div className="flex min-w-min items-center">
+            <EvolutionSpriteButton node={current} current onOpen={onOpenPokemon} />
+            {branches.length === 1 ? (
+              branches[0].map((evo) => (
+                <React.Fragment key={`${evo.slug}-${evo.stage}`}>
+                  <EvolutionArrow
+                    requirement={evo.requirement}
+                    itemSlug={evo.itemSlug}
+                    onOpenItem={onOpenItem}
+                  />
+                  <EvolutionSpriteButton
+                    node={{ slug: evo.slug, name: evo.name, sprite: evo.sprite }}
+                    onOpen={onOpenPokemon}
+                  />
+                </React.Fragment>
+              ))
+            ) : (
+              <div className="flex flex-col gap-3">
+                {branches.map((branch, branchIndex) => (
+                  <div key={branch[0]?.slug || branchIndex} className="flex items-center">
+                    {branch.map((evo) => (
+                      <React.Fragment key={`${evo.slug}-${evo.stage}`}>
+                        <EvolutionArrow
+                          requirement={evo.requirement}
+                          itemSlug={evo.itemSlug}
+                          onOpenItem={onOpenItem}
+                        />
+                        <EvolutionSpriteButton
+                          node={{ slug: evo.slug, name: evo.name, sprite: evo.sprite }}
+                          onOpen={onOpenPokemon}
+                        />
+                      </React.Fragment>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
