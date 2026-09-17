@@ -619,6 +619,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
                   name: pokemonData.displayName,
                   sprite: pokemonData.sprites.artwork,
                 }}
+                preEvolutions={pokemonData.preEvolutions}
                 evolutions={pokemonData.evolutions}
                 onOpenPokemon={(slug) => onOpenAnother('pokemon', slug)}
                 onOpenItem={(slug) => onOpenAnother('item', slug)}
@@ -725,11 +726,13 @@ const EvolutionArrow: React.FC<{
 
 const PokemonEvolutionList: React.FC<{
   current: EvolutionNode;
+  preEvolutions: PokemonEvolution[];
   evolutions: PokemonEvolution[];
   onOpenPokemon: (slug: string) => void;
   onOpenItem: (slug: string) => void;
-}> = ({ current, evolutions, onOpenPokemon, onOpenItem }) => {
+}> = ({ current, preEvolutions, evolutions, onOpenPokemon, onOpenItem }) => {
   const branches = groupEvolutionBranches(evolutions);
+  const hasLine = preEvolutions.length > 0 || evolutions.length > 0;
 
   return (
     <div className="space-y-2">
@@ -738,19 +741,32 @@ const PokemonEvolutionList: React.FC<{
           <GitBranch className={cn('w-3.5 h-3.5', TONES.success.ink)} />
           Evoluciones (8.ª gen.):
         </span>
-        {evolutions.length > 0 && (
+        {hasLine && (
           <span className={text.meta}>Clic para ver datos</span>
         )}
       </div>
 
-      {evolutions.length === 0 ? (
+      {!hasLine ? (
         <p className={cn(text.muted, 'px-1')}>
-          Este Pokémon no evoluciona más en Espada/Escudo.
+          Este Pokémon no tiene línea evolutiva en Espada/Escudo.
         </p>
       ) : (
         <div className={card({ padding: 'none', extra: 'overflow-x-auto p-3' })}>
           <div className="flex min-w-full justify-center">
             <div className="flex min-w-min items-center">
+            {preEvolutions.map((pre) => (
+              <React.Fragment key={`pre-${pre.slug}-${pre.stage}`}>
+                <EvolutionSpriteButton
+                  node={{ slug: pre.slug, name: pre.name, sprite: pre.sprite }}
+                  onOpen={onOpenPokemon}
+                />
+                <EvolutionArrow
+                  requirement={pre.requirement}
+                  itemSlug={pre.itemSlug}
+                  onOpenItem={onOpenItem}
+                />
+              </React.Fragment>
+            ))}
             <EvolutionSpriteButton node={current} current onOpen={onOpenPokemon} />
             {branches.length === 1 ? (
               branches[0].map((evo) => (
@@ -766,7 +782,7 @@ const PokemonEvolutionList: React.FC<{
                   />
                 </React.Fragment>
               ))
-            ) : (
+            ) : branches.length > 1 ? (
               <div className="flex flex-col gap-3">
                 {branches.map((branch, branchIndex) => (
                   <div key={branch[0]?.slug || branchIndex} className="flex items-center">
@@ -786,7 +802,7 @@ const PokemonEvolutionList: React.FC<{
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
             </div>
           </div>
         </div>

@@ -243,6 +243,7 @@ export interface PokemonDetail {
   stats: PokemonStat[];
   bst: number;
   learnset: PokemonLearnMove[];
+  preEvolutions: PokemonEvolution[];
   evolutions: PokemonEvolution[];
 }
 
@@ -633,12 +634,24 @@ function pickGen8EvolutionDetails(details: EvolutionDetailLike[], currentSlug: s
   });
 }
 
+function evolutionArtworkUrl(id: number): string {
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+}
+
 function evolutionSpriteUrl(detail: EvolutionDetailLike, speciesUrl: string): string {
   const id =
     resourceIdFromUrl(detail.evolved_form?.url) ||
     resourceIdFromUrl(speciesUrl) ||
     0;
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+  return evolutionArtworkUrl(id);
+}
+
+function previousEvolutionSpriteUrl(detail: EvolutionDetailLike, speciesUrl: string): string {
+  const id =
+    resourceIdFromUrl(detail.base_form?.url) ||
+    resourceIdFromUrl(speciesUrl) ||
+    0;
+  return evolutionArtworkUrl(id);
 }
 
 function findChainNode(node: ChainLinkLike, speciesName: string): ChainLinkLike | null {
@@ -650,16 +663,40 @@ function findChainNode(node: ChainLinkLike, speciesName: string): ChainLinkLike 
   return null;
 }
 
-async function getPokemonEvolutions(speciesName: string, pokemonSlug: string): Promise<PokemonEvolution[]> {
+function findParentNode(
+  node: ChainLinkLike,
+  speciesName: string
+): { parent: ChainLinkLike; child: ChainLinkLike } | null {
+  for (const child of node.evolves_to || []) {
+    if (child.species.name === speciesName) return { parent: node, child };
+    const nested = findParentNode(child, speciesName);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+function formatEvolutionEntry(details: EvolutionDetailLike[]): { requirement: string; itemSlug?: string } {
+  const formatted = details.map((d) => formatEvolutionRequirement(d));
+  return {
+    requirement: formatted.map((f) => f.text).filter((text, i, all) => all.indexOf(text) === i).join('  · o ·  '),
+    itemSlug: formatted.find((f) => f.itemSlug)?.itemSlug,
+  };
+}
+
+async function getPokemonEvolutionLine(
+  speciesName: string,
+  pokemonSlug: string
+): Promise<{ previous: PokemonEvolution[]; next: PokemonEvolution[] }> {
+  const empty = { previous: [] as PokemonEvolution[], next: [] as PokemonEvolution[] };
   try {
     const species = await pokemonClient.getPokemonSpeciesByName(speciesName);
     const chainId = resourceIdFromUrl(species.evolution_chain?.url);
-    if (!chainId) return [];
+    if (!chainId) return empty;
 
     const chain = await evolutionClient.getEvolutionChainById(chainId);
     const root = chain.chain as ChainLinkLike;
     const start = findChainNode(root, speciesName);
-    if (!start) return [];
+    if (!start) return empty;
 
     const dex = await fetchSwordShieldPokedex().catch(() => [] as DexPokemonEntry[]);
     const dexSlugs = new Set(dex.map((entry) => entry.slug));
@@ -668,39 +705,73 @@ async function getPokemonEvolutions(speciesName: string, pokemonSlug: string): P
       return dexSlugs.has(slug) || dexSlugs.has(speciesSlug);
     };
 
-    const results: PokemonEvolution[] = [];
+    const previous: PokemonEvolution[] = [];
+    let childSpecies = speciesName;
+    let childSlug = pokemonSlug;
+
+    while (true) {
+      const found = findParentNode(root, childSpecies);
+      if (!found) break;
+
+      let details = pickGen8EvolutionDetails(found.child.evolution_details || [], childSlug);
+      if (!details.length) {
+        details = pickGen8EvolutionDetails(found.child.evolution_details || [], found.parent.species.name);
+      }
+      if (!details.length) break;
+
+      const parentSlug = details[0].base_form?.name || found.parent.species.name;
+      if (!inSwsh(parentSlug, found.parent.species.name)) break;
+
+      const { requirement, itemSlug } = formatEvolutionEntry(details);
+      const displayName = titleCaseSlug(parentSlug);
+
+      previous.push({
+        slug: parentSlug,
+        name: displayName,
+        sprite: previousEvolutionSpriteUrl(details[0], found.parent.species.url),
+        fromName: titleCaseSlug(childSlug),
+        stage: previous.length + 1,
+        requirement,
+        itemSlug,
+      });
+
+      childSpecies = found.parent.species.name;
+      childSlug = parentSlug;
+    }
+
+    previous.reverse();
+
+    const next: PokemonEvolution[] = [];
 
     const walk = (node: ChainLinkLike, currentSlug: string, fromDisplay: string, stage: number) => {
-      for (const next of node.evolves_to || []) {
-        const details = pickGen8EvolutionDetails(next.evolution_details || [], currentSlug);
+      for (const nextNode of node.evolves_to || []) {
+        const details = pickGen8EvolutionDetails(nextNode.evolution_details || [], currentSlug);
         if (!details.length) continue;
 
-        const targetSlug = details[0].evolved_form?.name || next.species.name;
-        if (!inSwsh(targetSlug, next.species.name)) continue;
+        const targetSlug = details[0].evolved_form?.name || nextNode.species.name;
+        if (!inSwsh(targetSlug, nextNode.species.name)) continue;
 
-        const formatted = details.map((d) => formatEvolutionRequirement(d));
-        const requirement = formatted.map((f) => f.text).filter((text, i, all) => all.indexOf(text) === i).join('  · o ·  ');
-        const itemSlug = formatted.find((f) => f.itemSlug)?.itemSlug;
+        const { requirement, itemSlug } = formatEvolutionEntry(details);
         const displayName = titleCaseSlug(targetSlug);
 
-        results.push({
+        next.push({
           slug: targetSlug,
           name: displayName,
-          sprite: evolutionSpriteUrl(details[0], next.species.url),
+          sprite: evolutionSpriteUrl(details[0], nextNode.species.url),
           fromName: fromDisplay,
           stage,
           requirement,
           itemSlug,
         });
 
-        walk(next, targetSlug, displayName, stage + 1);
+        walk(nextNode, targetSlug, displayName, stage + 1);
       }
     };
 
     walk(start, pokemonSlug, titleCaseSlug(pokemonSlug), 1);
-    return results;
+    return { previous, next };
   } catch {
-    return [];
+    return empty;
   }
 }
 
@@ -1036,7 +1107,7 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       return a.nameEs.localeCompare(b.nameEs, 'es');
     });
 
-    const evolutions = await getPokemonEvolutions(
+    const { previous: preEvolutions, next: evolutions } = await getPokemonEvolutionLine(
       pokemon.species?.name || pokemon.name,
       pokemon.name
     );
@@ -1059,6 +1130,7 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       stats,
       bst,
       learnset,
+      preEvolutions,
       evolutions,
     };
 
@@ -1083,6 +1155,7 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       stats: [],
       bst: 0,
       learnset: [],
+      preEvolutions: [],
       evolutions: [],
     };
     return result;
