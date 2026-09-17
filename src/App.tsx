@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { translateRouteName } from './data/routeTranslations';
 import {
   getBuiltInTenants,
@@ -19,8 +19,9 @@ import { StoryModeView } from './components/StoryModeView';
 import { GameTenantModal } from './components/GameTenantModal';
 import { GameTenantSelector } from './components/GameTenantSelector';
 import { ManualPokemonPickerModal } from './components/ManualPokemonPickerModal';
+import { PokeApiCommandPalette, commandPaletteShortcutLabel } from './components/PokeApiCommandPalette';
 import { sfx } from './utils/audio';
-import { STARTERS_INFO, isStarterEncounter, starterEncounterUpdates } from './data/trainers/trainerTranslations';
+import { isStarterEncounter, starterEncounterUpdates } from './data/trainers/trainerTranslations';
 import {
   cn,
   panel,
@@ -34,7 +35,6 @@ import {
   surface,
   layout,
   segmented,
-  focusRing,
   bottomNavItem,
   TONES,
 } from './utils/ui';
@@ -54,11 +54,48 @@ import {
   BookOpen,
   Heart,
   Skull,
+  Search,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 const THEME_KEY = 'pokemon_tracker_theme_v1';
 const STARTER_STORAGE_KEY = 'pokemon_starter_choice_v1';
+
+type AppTab = 'story' | 'roulette' | 'history' | 'database';
+
+const INITIAL_TAB_VISITS: Record<AppTab, boolean> = {
+  story: true,
+  roulette: false,
+  history: false,
+  database: false,
+};
+
+function KeepAliveTab({
+  tab,
+  activeTab,
+  visited,
+  children,
+}: {
+  tab: AppTab;
+  activeTab: AppTab;
+  visited: Record<AppTab, boolean>;
+  children: React.ReactNode;
+}) {
+  if (!visited[tab]) return null;
+  const isActive = tab === activeTab;
+  return (
+    <div
+      id={`app-tab-${tab}`}
+      role="tabpanel"
+      hidden={!isActive}
+      aria-hidden={!isActive}
+      inert={!isActive}
+      className={isActive ? undefined : 'hidden'}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function App() {
   // Multi-Tenancy State (Bases de datos de juegos y mods)
@@ -84,12 +121,38 @@ export default function App() {
   }, [activeTenant]);
 
   const [isTenantModalOpen, setIsTenantModalOpen] = useState<boolean>(false);
+  const [isApiSearchOpen, setIsApiSearchOpen] = useState<boolean>(false);
   const [isManualPickerOpen, setIsManualPickerOpen] = useState<boolean>(false);
   const [selectionMode, setSelectionMode] = useState<'random' | 'manual'>('random');
   const [lastManualSaveId, setLastManualSaveId] = useState<string | null>(null);
 
   // Active navigation tab (Modo Historia is the primary adventure view)
-  const [activeTab, setActiveTab] = useState<'story' | 'roulette' | 'history' | 'database'>('story');
+  const [activeTab, setActiveTab] = useState<AppTab>('story');
+  const [visitedTabs, setVisitedTabs] = useState<Record<AppTab, boolean>>(INITIAL_TAB_VISITS);
+  const tabScrollRef = useRef<Record<AppTab, number>>({
+    story: 0,
+    roulette: 0,
+    history: 0,
+    database: 0,
+  });
+  const skipScrollRestoreRef = useRef(true);
+
+  const handleSetActiveTab = useCallback((tab: AppTab) => {
+    setActiveTab((current) => {
+      if (current === tab) return current;
+      tabScrollRef.current[current] = window.scrollY;
+      return tab;
+    });
+    setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (skipScrollRestoreRef.current) {
+      skipScrollRestoreRef.current = false;
+      return;
+    }
+    window.scrollTo(0, tabScrollRef.current[activeTab] ?? 0);
+  }, [activeTab]);
 
   // Dark mode state
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -439,12 +502,12 @@ export default function App() {
     return { alive, fainted, percentage };
   }, [history, allRoutes.length]);
 
-  const navBtn = (tab: typeof activeTab, label: string, icon: React.ReactNode) => {
+  const navBtn = (tab: AppTab, label: string, icon: React.ReactNode) => {
     const active = activeTab === tab;
     return (
       <button
         type="button"
-        onClick={() => setActiveTab(tab)}
+        onClick={() => handleSetActiveTab(tab)}
         title={label}
         className={segmented.item(active)}
       >
@@ -482,39 +545,22 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-            {activeTenant.id === 'blessed-shield' && (
-              <div className={cn(segmented.group, 'max-lg:hidden')}>
-                {(['grookey', 'scorbunny', 'sobble'] as StarterChoice[]).map((st) => {
-                  const isSel = starterChoice === st;
-                  const typeClass =
-                    st === 'grookey'
-                      ? 'bg-pokemon-planta'
-                      : st === 'scorbunny'
-                        ? 'bg-pokemon-fuego'
-                        : 'bg-pokemon-agua';
-                  return (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => handleSelectStarter(st)}
-                      title={`Inicial: ${STARTERS_INFO[st].name}`}
-                      aria-label={`Elegir a ${STARTERS_INFO[st].name} como inicial`}
-                      className={cn(
-                        'w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition-all duration-150',
-                        focusRing,
-                        isSel ? cn(typeClass, 'shadow-xs') : 'hover:bg-brand-card/60'
-                      )}
-                    >
-                      <img
-                        src={STARTERS_INFO[st].sprite}
-                        alt=""
-                        className={cn('w-9 h-9 pointer-events-none object-contain', !isSel && 'opacity-50 grayscale')}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <button
+              id="pokeapi-command-palette-button"
+              type="button"
+              onClick={() => setIsApiSearchOpen(true)}
+              title={`Buscar en PokéAPI (${commandPaletteShortcutLabel()})`}
+              aria-label={`Buscar en PokéAPI. Atajo ${commandPaletteShortcutLabel()}`}
+              className={cn(
+                btn('secondary', 'sm', 'accent', 'gap-2 max-sm:px-2'),
+              )}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden md:inline font-medium">Buscar</span>
+              <kbd className="hidden sm:inline-flex px-1.5 py-0.5 rounded-md border border-brand-border bg-brand-bg text-[10px] font-semibold text-brand-txt2">
+                {commandPaletteShortcutLabel()}
+              </kbd>
+            </button>
 
             <div className={cn(segmented.group, 'gap-1.5 px-2 py-1 tabular-nums')}>
               <span className={cn('flex items-center gap-0.5 text-xs font-semibold', TONES.success.ink)} title="Pokémon vivos / en caja">
@@ -567,7 +613,7 @@ export default function App() {
       {/* Main Content Area */}
       <main className={cn('flex-1 pt-6 pb-24 lg:py-6 space-y-6', layout.container)}>
         {/* VIEW 0: MODO HISTORIA (UNIFIED CHRONOLOGICAL TIMELINE) */}
-        {activeTab === 'story' && (
+        <KeepAliveTab tab="story" activeTab={activeTab} visited={visitedTabs}>
           <StoryModeView
             activeTenant={activeTenant}
             history={history}
@@ -585,10 +631,10 @@ export default function App() {
             starterChoice={starterChoice}
             onSelectStarter={handleSelectStarter}
           />
-        )}
+        </KeepAliveTab>
 
         {/* VIEW 1: ROULETTE / ENCOUNTER GENERATOR */}
-        {activeTab === 'roulette' && (
+        <KeepAliveTab tab="roulette" activeTab={activeTab} visited={visitedTabs}>
           <div className={layout.view}>
             {/* 1. Sleek Route Bar: Minimal single-row navigation */}
             <QuickRouteBar
@@ -756,7 +802,7 @@ export default function App() {
                   </h3>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('history')}
+                    onClick={() => handleSetActiveTab('history')}
                     className={cn(text.link, 'text-xs')}
                   >
                     Ver bitácora completa ({history.length})
@@ -780,10 +826,10 @@ export default function App() {
               </div>
             )}
           </div>
-        )}
+        </KeepAliveTab>
 
         {/* VIEW 2: SAVED HISTORY BITÁCORA */}
-        {activeTab === 'history' && (
+        <KeepAliveTab tab="history" activeTab={activeTab} visited={visitedTabs}>
           <SavedHistoryView
             history={history}
             onUpdate={handleUpdateEncounter}
@@ -795,10 +841,10 @@ export default function App() {
             starterChoice={starterChoice}
             onSelectStarter={handleSelectStarter}
           />
-        )}
+        </KeepAliveTab>
 
         {/* VIEW 3: ROUTE ENCOUNTER DATABASE EXPLORER */}
-        {activeTab === 'database' && (
+        <KeepAliveTab tab="database" activeTab={activeTab} visited={visitedTabs}>
           <RouteDatabaseView
             routes={allRoutes}
             history={history}
@@ -806,10 +852,10 @@ export default function App() {
             onOpenTenantModal={() => setIsTenantModalOpen(true)}
             onSelectRouteForRoll={(routeId) => {
               setSelectedRouteId(routeId);
-              setActiveTab('roulette');
+              handleSetActiveTab('roulette');
             }}
           />
-        )}
+        </KeepAliveTab>
       </main>
 
       {/* Multi-Tenancy Game Selector & Management Modal */}
@@ -822,6 +868,12 @@ export default function App() {
         onAddCustomTenant={handleAddCustomTenant}
         onDeleteCustomTenant={handleDeleteCustomTenant}
         history={history}
+      />
+
+      <PokeApiCommandPalette
+        isOpen={isApiSearchOpen}
+        onOpen={() => setIsApiSearchOpen(true)}
+        onClose={() => setIsApiSearchOpen(false)}
       />
 
       {/* Manual Pokemon Picker Modal ("Elegir a dedo") */}
@@ -837,19 +889,19 @@ export default function App() {
       )}
 
       <nav className={surface.bottomNav} aria-label="Navegación principal">
-        <button type="button" onClick={() => setActiveTab('story')} className={bottomNavItem(activeTab === 'story')}>
+        <button type="button" onClick={() => handleSetActiveTab('story')} className={bottomNavItem(activeTab === 'story')}>
           <BookOpen className="w-5 h-5" />
           Historia
         </button>
-        <button type="button" onClick={() => setActiveTab('roulette')} className={bottomNavItem(activeTab === 'roulette')}>
+        <button type="button" onClick={() => handleSetActiveTab('roulette')} className={bottomNavItem(activeTab === 'roulette')}>
           <Dice5 className="w-5 h-5" />
           Ruleta
         </button>
-        <button type="button" onClick={() => setActiveTab('history')} className={bottomNavItem(activeTab === 'history')}>
+        <button type="button" onClick={() => handleSetActiveTab('history')} className={bottomNavItem(activeTab === 'history')}>
           <BookmarkCheck className="w-5 h-5" />
           Bitácora
         </button>
-        <button type="button" onClick={() => setActiveTab('database')} className={bottomNavItem(activeTab === 'database')}>
+        <button type="button" onClick={() => handleSetActiveTab('database')} className={bottomNavItem(activeTab === 'database')}>
           <Layers className="w-5 h-5" />
           Datos
         </button>

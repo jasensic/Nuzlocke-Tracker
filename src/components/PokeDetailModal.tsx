@@ -200,7 +200,7 @@ export const PokeDetailModal: React.FC<PokeDetailModalProps> = ({
     <motion.div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-brand-bg/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-4 bg-brand-bg/70 backdrop-blur-sm"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}

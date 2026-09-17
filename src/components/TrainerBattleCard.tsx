@@ -17,6 +17,9 @@ import {
 import { cn, card, btn, pill, pillSolid, pillShape, text, TONES } from '../utils/ui';
 import { getPokemonSprite } from '../utils/pokemonMeta';
 
+/** Session-level memory so an open team stays open if the card remounts. */
+const expandedBattleIds = new Set<string>();
+
 interface TrainerBattleCardProps {
   battle: TrainerBattle;
   starterChoice: StarterChoice;
@@ -36,8 +39,17 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
 }) => {
   const { openDetail } = usePokeDetail();
   // Collapsed by default for maximum rendering performance & cleanliness
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(() => expandedBattleIds.has(battle.id));
   const [avatarError, setAvatarError] = useState(false);
+
+  const toggleExpanded = () => {
+    setIsExpanded((prev) => {
+      const next = !prev;
+      if (next) expandedBattleIds.add(battle.id);
+      else expandedBattleIds.delete(battle.id);
+      return next;
+    });
+  };
 
   const trainerMeta = getTrainerMeta(battle.trainerId);
 
@@ -128,7 +140,7 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
             )}
             <button
               type="button"
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={toggleExpanded}
               className={btn('secondary', 'xs')}
             >
               <span>{isExpanded ? 'Ocultar' : 'Equipo'}</span>
@@ -259,7 +271,7 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
 
             <button
               type="button"
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={toggleExpanded}
               className={btn('secondary', 'sm')}
             >
               <span>{isExpanded ? 'Ocultar' : 'Ver Equipo'}</span>
@@ -322,7 +334,10 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
 
             <button
               type="button"
-              onClick={() => setIsExpanded(true)}
+              onClick={() => {
+                expandedBattleIds.add(battle.id);
+                setIsExpanded(true);
+              }}
               className={cn(text.link, 'text-xs flex items-center gap-1 ml-auto')}
             >
               <span>Ver Movimientos y Habilidades</span>

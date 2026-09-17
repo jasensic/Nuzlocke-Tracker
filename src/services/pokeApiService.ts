@@ -8,7 +8,7 @@ import {
   getItemInfo,
   getMoveInfo,
 } from '../data/trainers/trainerTranslations';
-import { parsePokemonName } from '../utils/pokemonMeta';
+import { parsePokemonName, getPokemonSprite } from '../utils/pokemonMeta';
 
 // ==========================================
 // POKENODE-TS OFFICIAL CACHE SETUP
@@ -1087,4 +1087,318 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
     };
     return result;
   }
+}
+
+// ==========================================
+// COMMAND PALETTE / GLOBAL API SEARCH
+// ==========================================
+
+export type PokeSearchKind = 'pokemon' | 'move' | 'ability' | 'item';
+
+export interface PokeSearchHit {
+  kind: PokeSearchKind;
+  slug: string;
+  name: string;
+  nameEs: string;
+  score: number;
+  sprite?: string;
+  spriteFallbacks?: string[];
+}
+
+interface PokeSearchIndexEntry {
+  kind: PokeSearchKind;
+  slug: string;
+  name: string;
+  nameEs: string;
+  haystack: string;
+  sprite?: string;
+  spriteFallbacks?: string[];
+}
+
+const KIND_PRIORITY: Record<PokeSearchKind, number> = {
+  pokemon: 0,
+  move: 1,
+  ability: 2,
+  item: 3,
+};
+
+let searchIndexPromise: Promise<PokeSearchIndexEntry[]> | null = null;
+let searchIndex: PokeSearchIndexEntry[] | null = null;
+
+function englishFromSlug(slug: string): string {
+  return titleCaseSlug(slug);
+}
+
+function uniqueUrls(...urls: Array<string | undefined | null>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const url of urls) {
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
+function pokeApiPokemonSprite(id: number, variant: 'default' | 'home' | 'artwork' = 'default'): string {
+  if (variant === 'home') {
+    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`;
+  }
+  if (variant === 'artwork') {
+    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+  }
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+}
+
+function pokemonSpriteChain(url: string, slug: string, name: string): { sprite?: string; spriteFallbacks?: string[] } {
+  const id = resourceIdFromUrl(url);
+  const showdown = getPokemonSprite(name || slug).sprite;
+  const baseShowdown = getPokemonSprite(slug.split('-')[0] || name).sprite;
+  const chain = uniqueUrls(
+    id ? pokeApiPokemonSprite(id, 'artwork') : undefined,
+    id ? pokeApiPokemonSprite(id, 'home') : undefined,
+    id ? pokeApiPokemonSprite(id) : undefined,
+    showdown,
+    baseShowdown
+  );
+  return { sprite: chain[0], spriteFallbacks: chain.slice(1) };
+}
+
+function itemSpriteChain(slug: string): { sprite?: string; spriteFallbacks?: string[] } {
+  const chain = uniqueUrls(
+    `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${slug}.png`,
+    `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/icons/${slug}.png`
+  );
+  return { sprite: chain[0], spriteFallbacks: chain.slice(1) };
+}
+
+function toIndexEntry(
+  kind: PokeSearchKind,
+  slug: string,
+  name: string,
+  nameEs: string,
+  sprite?: string,
+  spriteFallbacks?: string[]
+): PokeSearchIndexEntry {
+  return {
+    kind,
+    slug,
+    name,
+    nameEs,
+    haystack: `${name} ${nameEs} ${slug}`.toLowerCase(),
+    sprite,
+    spriteFallbacks,
+  };
+}
+
+async function loadPokeSearchIndex(): Promise<PokeSearchIndexEntry[]> {
+  const [pokemonPage, movePage, abilityPage, itemPage] = await Promise.all([
+    pokemonClient.listPokemons(0, 2000),
+    moveClient.listMoves(0, 1000),
+    pokemonClient.listAbilities(0, 500),
+    itemClient.listItems(0, 2200),
+  ]);
+
+  const entries: PokeSearchIndexEntry[] = [];
+
+  for (const resource of pokemonPage.results) {
+    const name = englishFromSlug(resource.name);
+    const sprites = pokemonSpriteChain(resource.url, resource.name, name);
+    entries.push(
+      toIndexEntry('pokemon', resource.name, name, name, sprites.sprite, sprites.spriteFallbacks)
+    );
+  }
+
+  for (const resource of movePage.results) {
+    const name = englishFromSlug(resource.name);
+    const nameEs = getMoveInfo(name).spanishName;
+    entries.push(toIndexEntry('move', resource.name, name, nameEs));
+  }
+
+  for (const resource of abilityPage.results) {
+    const name = englishFromSlug(resource.name);
+    const nameEs = translateAbility(name);
+    entries.push(toIndexEntry('ability', resource.name, name, nameEs));
+  }
+
+  for (const resource of itemPage.results) {
+    const name = englishFromSlug(resource.name);
+    const nameEs = getItemInfo(name).name;
+    const sprites = itemSpriteChain(resource.name);
+    entries.push(
+      toIndexEntry('item', resource.name, name, nameEs, sprites.sprite, sprites.spriteFallbacks)
+    );
+  }
+
+  return entries;
+}
+
+/** Prefetch and cache the PokéAPI name catalogs used by the command palette. */
+export function ensurePokeSearchIndex(): Promise<void> {
+  if (searchIndex) return Promise.resolve();
+  if (!searchIndexPromise) {
+    searchIndexPromise = loadPokeSearchIndex()
+      .then((entries) => {
+        searchIndex = entries;
+        return entries;
+      })
+      .catch((err) => {
+        searchIndexPromise = null;
+        throw err;
+      });
+  }
+  return searchIndexPromise.then(() => undefined);
+}
+
+function scoreHit(query: string, entry: PokeSearchIndexEntry): number {
+  const q = query.toLowerCase();
+  const name = entry.name.toLowerCase();
+  const nameEs = entry.nameEs.toLowerCase();
+  const slug = entry.slug.toLowerCase();
+
+  if (name === q || nameEs === q || slug === q) return 100;
+  if (name.startsWith(q) || nameEs.startsWith(q) || slug.startsWith(q)) return 80;
+  if (name.includes(q) || nameEs.includes(q) || slug.includes(q) || entry.haystack.includes(q)) {
+    return 50;
+  }
+  return 0;
+}
+
+export interface PokeSearchQuery {
+  text: string;
+  kind: PokeSearchKind | 'all';
+}
+
+/** Parse VS Code-style prefixes: @pokemon, #move, $ability, !item. */
+export function parsePokeSearchQuery(raw: string): PokeSearchQuery {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('@')) return { kind: 'pokemon', text: trimmed.slice(1).trim() };
+  if (trimmed.startsWith('#')) return { kind: 'move', text: trimmed.slice(1).trim() };
+  if (trimmed.startsWith('$')) return { kind: 'ability', text: trimmed.slice(1).trim() };
+  if (trimmed.startsWith('!')) return { kind: 'item', text: trimmed.slice(1).trim() };
+  return { kind: 'all', text: trimmed };
+}
+
+export function searchPokeApiIndex(
+  rawQuery: string,
+  kindFilter: PokeSearchKind | 'all' = 'all',
+  limit = 40
+): PokeSearchHit[] {
+  if (!searchIndex) return [];
+  const parsed = parsePokeSearchQuery(rawQuery);
+  const kind = parsed.kind !== 'all' ? parsed.kind : kindFilter;
+  const query = parsed.text;
+  if (!query) return [];
+
+  const hits: PokeSearchHit[] = [];
+  for (const entry of searchIndex) {
+    if (kind !== 'all' && entry.kind !== kind) continue;
+    const score = scoreHit(query, entry);
+    if (score <= 0) continue;
+    hits.push({
+      kind: entry.kind,
+      slug: entry.slug,
+      name: entry.name,
+      nameEs: entry.nameEs,
+      score,
+      sprite: entry.sprite,
+      spriteFallbacks: entry.spriteFallbacks,
+    });
+  }
+
+  hits.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const kindDelta = KIND_PRIORITY[a.kind] - KIND_PRIORITY[b.kind];
+    if (kindDelta !== 0) return kindDelta;
+    return a.name.localeCompare(b.name, 'en');
+  });
+
+  return hits.slice(0, limit);
+}
+
+/** Direct lookup when the local catalog has no matches (typos / exact slugs). */
+export async function lookupPokeApiExact(rawQuery: string): Promise<PokeSearchHit[]> {
+  const parsed = parsePokeSearchQuery(rawQuery);
+  const slug = toPokeApiSlug(parsed.text);
+  if (!slug || slug.length < 2) return [];
+
+  const attempts: Array<{ kind: PokeSearchKind; run: () => Promise<PokeSearchHit> }> = [];
+
+  if (parsed.kind === 'all' || parsed.kind === 'pokemon') {
+    attempts.push({
+      kind: 'pokemon',
+      run: async () => {
+        const pokemon = await pokemonClient.getPokemonByName(slug);
+        const name = englishFromSlug(pokemon.name);
+        const sprites = pokemonSpriteChain(
+          `https://pokeapi.co/api/v2/pokemon/${pokemon.id}/`,
+          pokemon.name,
+          name
+        );
+        return {
+          kind: 'pokemon',
+          slug: pokemon.name,
+          name,
+          nameEs: name,
+          score: 90,
+          sprite: sprites.sprite,
+          spriteFallbacks: sprites.spriteFallbacks,
+        };
+      },
+    });
+  }
+  if (parsed.kind === 'all' || parsed.kind === 'move') {
+    attempts.push({
+      kind: 'move',
+      run: async () => {
+        const move = await moveClient.getMoveByName(slug);
+        const name = englishFromSlug(move.name);
+        return {
+          kind: 'move',
+          slug: move.name,
+          name,
+          nameEs: getMoveInfo(name).spanishName,
+          score: 90,
+        };
+      },
+    });
+  }
+  if (parsed.kind === 'all' || parsed.kind === 'ability') {
+    attempts.push({
+      kind: 'ability',
+      run: async () => {
+        const ability = await pokemonClient.getAbilityByName(slug);
+        const name = englishFromSlug(ability.name);
+        return {
+          kind: 'ability',
+          slug: ability.name,
+          name,
+          nameEs: translateAbility(name),
+          score: 90,
+        };
+      },
+    });
+  }
+  if (parsed.kind === 'all' || parsed.kind === 'item') {
+    attempts.push({
+      kind: 'item',
+      run: async () => {
+        const item = await itemClient.getItemByName(slug);
+        const name = englishFromSlug(item.name);
+        const sprites = itemSpriteChain(item.name);
+        return {
+          kind: 'item',
+          slug: item.name,
+          name,
+          nameEs: getItemInfo(name).name,
+          score: 90,
+          sprite: sprites.sprite,
+          spriteFallbacks: sprites.spriteFallbacks,
+        };
+      },
+    });
+  }
+
+  const settled = await Promise.allSettled(attempts.map((attempt) => attempt.run()));
+  return settled.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
 }
