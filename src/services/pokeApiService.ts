@@ -1258,7 +1258,7 @@ function toIndexEntry(
     slug,
     name,
     nameEs,
-    haystack: `${name} ${nameEs} ${slug}`.toLowerCase(),
+    haystack: foldForSearch(`${name} ${nameEs} ${slug}`),
     sprite,
     spriteFallbacks,
   };
@@ -1323,15 +1323,24 @@ export function ensurePokeSearchIndex(): Promise<void> {
   return searchIndexPromise.then(() => undefined);
 }
 
+/** Case-fold and strip diacritics so "puas" matches "Púas". */
+function foldForSearch(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function scoreHit(query: string, entry: PokeSearchIndexEntry): number {
-  const q = query.toLowerCase();
-  const name = entry.name.toLowerCase();
-  const nameEs = entry.nameEs.toLowerCase();
-  const slug = entry.slug.toLowerCase();
+  const q = foldForSearch(query);
+  const name = foldForSearch(entry.name);
+  const nameEs = foldForSearch(entry.nameEs);
+  const slug = foldForSearch(entry.slug);
+  const haystack = foldForSearch(entry.haystack);
 
   if (name === q || nameEs === q || slug === q) return 100;
   if (name.startsWith(q) || nameEs.startsWith(q) || slug.startsWith(q)) return 80;
-  if (name.includes(q) || nameEs.includes(q) || slug.includes(q) || entry.haystack.includes(q)) {
+  if (name.includes(q) || nameEs.includes(q) || slug.includes(q) || haystack.includes(q)) {
     return 50;
   }
   return 0;
