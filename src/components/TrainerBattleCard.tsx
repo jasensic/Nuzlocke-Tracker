@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TrainerBattle, StarterChoice } from '../types';
 import { TrainerPokemonCard } from './TrainerPokemonCard';
+import { TrainerFocusModal } from './TrainerFocusModal';
 import { TRAINERS_META, STARTERS_INFO, getTrainerMeta } from '../data/trainers/trainerTranslations';
 import { usePokeDetail } from '../context/PokeDetailContext';
 import {
@@ -13,6 +14,7 @@ import {
   Users,
   ShieldAlert,
   CheckCircle2,
+  Maximize2,
 } from 'lucide-react';
 import { cn, card, btn, pill, pillSolid, pillShape, text, TONES } from '../utils/ui';
 import { getPokemonSprite } from '../utils/pokemonMeta';
@@ -26,6 +28,7 @@ interface TrainerBattleCardProps {
   index: number;
   isDefeated?: boolean;
   onToggleDefeated?: (battleId: string) => void;
+  onSelectStarter?: (starter: StarterChoice) => void;
   compact?: boolean;
 }
 
@@ -35,11 +38,13 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
   index,
   isDefeated = false,
   onToggleDefeated,
+  onSelectStarter,
   compact = false,
 }) => {
   const { openDetail } = usePokeDetail();
   // Collapsed by default for maximum rendering performance & cleanliness
   const [isExpanded, setIsExpanded] = useState(() => expandedBattleIds.has(battle.id));
+  const [isFocusOpen, setIsFocusOpen] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
 
   const toggleExpanded = () => {
@@ -128,6 +133,15 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsFocusOpen(true)}
+              className={btn('primary', 'xs', 'accent')}
+              title="Abrir en Modo Focus (pantalla completa con buscador sin distracciones)"
+            >
+              <Maximize2 className="w-3 h-3" />
+              <span>Focus</span>
+            </button>
             {onToggleDefeated && (
               <button
                 type="button"
@@ -162,6 +176,17 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
             </div>
           </div>
         )}
+
+        {/* TRAINER FOCUS MODE MODAL */}
+        <TrainerFocusModal
+          isOpen={isFocusOpen}
+          onClose={() => setIsFocusOpen(false)}
+          battle={battle}
+          starterChoice={starterChoice}
+          isDefeated={isDefeated}
+          onToggleDefeated={onToggleDefeated}
+          onSelectStarter={onSelectStarter}
+        />
       </article>
     );
   }
@@ -255,8 +280,18 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
             </div>
           </div>
 
-          {/* Right Action: Victory / Collapse Toggle */}
+          {/* Right Action: Focus Mode / Victory / Collapse Toggle */}
           <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsFocusOpen(true)}
+              className={btn('primary', 'sm', 'accent')}
+              title="Abrir en Modo Focus (pantalla completa sin distracciones con buscador)"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span>Modo Focus</span>
+            </button>
+
             {onToggleDefeated && (
               <button
                 type="button"
@@ -360,6 +395,17 @@ export const TrainerBattleCard: React.FC<TrainerBattleCardProps> = ({
           </div>
         </div>
       )}
+
+      {/* TRAINER FOCUS MODE MODAL */}
+      <TrainerFocusModal
+        isOpen={isFocusOpen}
+        onClose={() => setIsFocusOpen(false)}
+        battle={battle}
+        starterChoice={starterChoice}
+        isDefeated={isDefeated}
+        onToggleDefeated={onToggleDefeated}
+        onSelectStarter={onSelectStarter}
+      />
     </article>
   );
 };

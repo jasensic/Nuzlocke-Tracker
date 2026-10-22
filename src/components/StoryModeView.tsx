@@ -45,6 +45,7 @@ import {
   Check,
   MapPin,
   ArrowRight,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   cn,
@@ -256,6 +257,9 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
     } catch {}
     return false;
   });
+
+  // Toggle for top options menu (filters, search, upcoming milestone banner)
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const handleToggleCompact = () => {
     setIsCompact((prev) => {
@@ -556,151 +560,204 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
 
   return (
     <div className={layout.view}>
-      {nextActiveItem ? (
-        <section className={panelLg('relative overflow-hidden')}>
-          <div className="absolute -right-10 -top-10 w-44 h-44 bg-brand-accent/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-start sm:items-center gap-4">
-              <div className={iconTile('accent', 'w-12 h-12 shrink-0')}>
-                <Target className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className={pillSolid('accent', 'xs')}>
-                    Próximo Hito
-                  </span>
-                  <span className={cn(text.muted, 'flex items-center gap-1')}>
-                    <MapPin className={cn('w-3 h-3', TONES.accent.ink)} />
-                    {nextActiveItem.chapter.title.split(':')[0]} · {activeTenant.region}
-                  </span>
-                </div>
-                <h1 className={text.pageTitle}>
-                  {nextActiveItem.location}
-                  {nextActiveItem.type === 'capture' && (
-                    <span className={pill('info', 'sm', 'ml-2 align-middle')}>
-                      {isNextStarterGift ? 'Inicial de Lionel' : 'Ruleta disponible'}
-                    </span>
-                  )}
-                </h1>
-                <p className={cn(text.muted, 'sm:text-sm mt-0.5')}>
-                  {nextActiveItem.subtitle}
-                </p>
-              </div>
-            </div>
-            <div className="w-full md:w-auto flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleJumpToNextActive}
-                className={btn('primary', 'lg', 'accent', 'w-full md:w-auto')}
-              >
-                {isNextStarterGift ? (
-                  <Award className="w-4 h-4" />
-                ) : nextActiveItem.type === 'capture' ? (
-                  <Dice5 className="w-4 h-4" />
-                ) : (
-                  <Swords className="w-4 h-4" />
-                )}
-                <span>
-                  {isNextStarterGift
-                    ? 'Elegir Inicial'
-                    : nextActiveItem.type === 'capture'
-                      ? 'Girar Ruleta Ahora'
-                      : 'Ver Combate'}
-                </span>
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section className={card({ tone: 'success', extra: 'text-center' })}>
-          <div className="text-sm font-bold flex items-center justify-center gap-1.5">
-            <Trophy className="w-4 h-4" />
-            <span>¡Enhorabuena! Has completado todos los hitos de la aventura</span>
-          </div>
-        </section>
-      )}
-
-      <section className={panel('flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3')}>
-        <div className={field.withIcon}>
-          <Search className={field.icon} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por ruta, especie, tipo o rival..."
-            className={cn(field.input, field.iconInputPad, 'pr-10')}
-          />
-          {searchQuery && (
-            <button type="button" onClick={() => setSearchQuery('')} className={iconBtn('ghost', 'sm', 'neutral', 'absolute right-1.5 top-1/2 -translate-y-1/2 text-xs')}>
-              ✕
-            </button>
+      {/* 1. TOP MINIMAL BAR: Hitos summary & toggle button to hide/show banner and filters */}
+      <div className="flex items-center justify-between gap-3 pb-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-bold uppercase tracking-wider text-brand-txt2">
+            Modo Historia
+          </span>
+          <span className="text-brand-txt2 text-xs">•</span>
+          <span className="text-xs font-semibold text-brand-txt1">
+            {progressStats.completedCount}/{progressStats.totalItems} hitos completados
+          </span>
+          {(searchQuery || filterType !== 'all') && (
+            <span className={pillSolid('warning', 'xs')}>
+              Filtro activo
+            </span>
           )}
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-nowrap">
-          {(
-            [
-              { id: 'all', label: `Todos (${fullTimeline.length})` },
-              { id: 'pending', label: `Pendientes (${progressStats.totalItems - progressStats.completedCount})`, dot: 'bg-status-pending' },
-              { id: 'capture', label: `Rutas (${progressStats.totalCaptures})`, icon: 'map' },
-              { id: 'battle', label: `Combates (${progressStats.totalBattles})`, icon: 'swords' },
-              { id: 'completed', label: `Completados (${progressStats.completedCount})`, dot: 'bg-status-live' },
-            ] as const
-          ).map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilterType(f.id)}
-              className={filterChip(filterType === f.id)}
-            >
-              {'dot' in f && f.dot ? <span className={cn('w-2 h-2 rounded-full', f.dot)} /> : null}
-              {f.id === 'battle' ? <Swords className="w-3 h-3" /> : null}
-              {f.id === 'capture' ? <MapPin className="w-3 h-3" /> : null}
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </section>
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className={cn(segmented.group, 'self-start')}>
-          <button
-            type="button"
-            onClick={() => handleSetViewScope('chapter')}
-            className={segmented.item(effectiveViewScope === 'chapter')}
-          >
-            <Compass className="w-3.5 h-3.5" />
-            Por Etapas
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSetViewScope('all')}
-            className={segmented.item(effectiveViewScope === 'all')}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            Toda la Región
-          </button>
-        </div>
+        {/* Toggle Menu Button to Hide/Show Banner and Filters */}
         <div className="flex items-center gap-2">
+          {(searchQuery || filterType !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setFilterType('all');
+              }}
+              className="text-xs text-brand-txt2 hover:text-brand-accent underline cursor-pointer"
+            >
+              Limpiar filtro
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={handleToggleCompact}
-            className={filterChip(isCompact)}
+            onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+            className={filterChip(showOptionsMenu || searchQuery.trim().length > 0 || filterType !== 'all')}
+            title="Mostrar u ocultar banner superior, buscador y filtros"
           >
-            <LayoutList className="w-3.5 h-3.5" />
-            {isCompact ? 'Vista Compacta' : 'Vista Detallada'}
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span className="text-xs">Filtros y Menú</span>
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", showOptionsMenu && "rotate-180")} />
           </button>
-          {effectiveViewScope === 'all' && (
-            <>
-              <button type="button" onClick={handleCollapseAllChapters} className={btn('secondary', 'sm')}>
-                Plegar
-              </button>
-              <button type="button" onClick={handleExpandAllChapters} className={btn('secondary', 'sm')}>
-                Desplegar
-              </button>
-            </>
-          )}
         </div>
       </div>
+
+      {/* 2. COLLAPSIBLE MENU (Hidden by default to eliminate clutter) */}
+      {showOptionsMenu && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* Banner: Próximo Hito */}
+          {nextActiveItem ? (
+            <section className={panelLg('relative overflow-hidden')}>
+              <div className="absolute -right-10 -top-10 w-44 h-44 bg-brand-accent/15 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-start sm:items-center gap-4">
+                  <div className={iconTile('accent', 'w-12 h-12 shrink-0')}>
+                    <Target className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className={pillSolid('accent', 'xs')}>
+                        Próximo Hito
+                      </span>
+                      <span className={cn(text.muted, 'flex items-center gap-1')}>
+                        <MapPin className={cn('w-3 h-3', TONES.accent.ink)} />
+                        {nextActiveItem.chapter.title.split(':')[0]} · {activeTenant.region}
+                      </span>
+                    </div>
+                    <h1 className={text.pageTitle}>
+                      {nextActiveItem.location}
+                      {nextActiveItem.type === 'capture' && (
+                        <span className={pill('info', 'sm', 'ml-2 align-middle')}>
+                          {isNextStarterGift ? 'Inicial de Lionel' : 'Ruleta disponible'}
+                        </span>
+                      )}
+                    </h1>
+                    <p className={cn(text.muted, 'sm:text-sm mt-0.5')}>
+                      {nextActiveItem.subtitle}
+                    </p>
+                  </div>
+                </div>
+                <div className="w-full md:w-auto flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleJumpToNextActive}
+                    className={btn('primary', 'lg', 'accent', 'w-full md:w-auto')}
+                  >
+                    {isNextStarterGift ? (
+                      <Award className="w-4 h-4" />
+                    ) : nextActiveItem.type === 'capture' ? (
+                      <Dice5 className="w-4 h-4" />
+                    ) : (
+                      <Swords className="w-4 h-4" />
+                    )}
+                    <span>
+                      {isNextStarterGift
+                        ? 'Elegir Inicial'
+                        : nextActiveItem.type === 'capture'
+                          ? 'Girar Ruleta Ahora'
+                          : 'Ver Combate'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : (
+            <section className={card({ tone: 'success', extra: 'text-center' })}>
+              <div className="text-sm font-bold flex items-center justify-center gap-1.5">
+                <Trophy className="w-4 h-4" />
+                <span>¡Enhorabuena! Has completado todos los hitos de la aventura</span>
+              </div>
+            </section>
+          )}
+
+          {/* Search and Filter Chips */}
+          <section className={panel('flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3')}>
+            <div className={field.withIcon}>
+              <Search className={field.icon} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por ruta, especie, tipo o rival..."
+                className={cn(field.input, field.iconInputPad, 'pr-10')}
+              />
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery('')} className={iconBtn('ghost', 'sm', 'neutral', 'absolute right-1.5 top-1/2 -translate-y-1/2 text-xs')}>
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-nowrap">
+              {(
+                [
+                  { id: 'all', label: `Todos (${fullTimeline.length})` },
+                  { id: 'pending', label: `Pendientes (${progressStats.totalItems - progressStats.completedCount})`, dot: 'bg-status-pending' },
+                  { id: 'capture', label: `Rutas (${progressStats.totalCaptures})`, icon: 'map' },
+                  { id: 'battle', label: `Combates (${progressStats.totalBattles})`, icon: 'swords' },
+                  { id: 'completed', label: `Completados (${progressStats.completedCount})`, dot: 'bg-status-live' },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFilterType(f.id)}
+                  className={filterChip(filterType === f.id)}
+                >
+                  {'dot' in f && f.dot ? <span className={cn('w-2 h-2 rounded-full', f.dot)} /> : null}
+                  {f.id === 'battle' ? <Swords className="w-3 h-3" /> : null}
+                  {f.id === 'capture' ? <MapPin className="w-3 h-3" /> : null}
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* View Scope (Por Etapas vs Toda la Región) & Compact Mode */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+            <div className={cn(segmented.group, 'self-start')}>
+              <button
+                type="button"
+                onClick={() => handleSetViewScope('chapter')}
+                className={segmented.item(effectiveViewScope === 'chapter')}
+              >
+                <Compass className="w-3.5 h-3.5" />
+                Por Etapas
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetViewScope('all')}
+                className={segmented.item(effectiveViewScope === 'all')}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Toda la Región
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleToggleCompact}
+                className={filterChip(isCompact)}
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                {isCompact ? 'Vista Compacta' : 'Vista Detallada'}
+              </button>
+              {effectiveViewScope === 'all' && (
+                <>
+                  <button type="button" onClick={handleCollapseAllChapters} className={btn('secondary', 'sm')}>
+                    Plegar
+                  </button>
+                  <button type="button" onClick={handleExpandAllChapters} className={btn('secondary', 'sm')}>
+                    Desplegar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4. MAIN CONTENT AREA */}
       {effectiveViewScope === 'chapter' ? (
@@ -889,6 +946,7 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                         index={item.battleData.order - 1}
                         isDefeated={isDefeated}
                         onToggleDefeated={handleToggleDefeated}
+                        onSelectStarter={handleSelectStarter}
                         compact={isCompact}
                       />
                     </TimelineMilestone>
@@ -1115,6 +1173,7 @@ export const StoryModeView: React.FC<StoryModeViewProps> = ({
                                 index={item.battleData.order - 1}
                                 isDefeated={isDefeated}
                                 onToggleDefeated={handleToggleDefeated}
+                                onSelectStarter={handleSelectStarter}
                                 compact={isCompact}
                               />
                             </TimelineMilestone>

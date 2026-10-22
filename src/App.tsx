@@ -19,6 +19,7 @@ import { StoryModeView } from './components/StoryModeView';
 import { GameTenantModal } from './components/GameTenantModal';
 import { GameTenantSelector } from './components/GameTenantSelector';
 import { ManualPokemonPickerModal } from './components/ManualPokemonPickerModal';
+import { RealRouletteModal } from './components/RealRouletteModal';
 import { PokeApiCommandPalette, commandPaletteShortcutLabel } from './components/PokeApiCommandPalette';
 import { sfx } from './utils/audio';
 import { isStarterEncounter, starterEncounterUpdates } from './data/trainers/trainerTranslations';
@@ -123,6 +124,7 @@ export default function App() {
   const [isTenantModalOpen, setIsTenantModalOpen] = useState<boolean>(false);
   const [isApiSearchOpen, setIsApiSearchOpen] = useState<boolean>(false);
   const [isManualPickerOpen, setIsManualPickerOpen] = useState<boolean>(false);
+  const [isRealWheelOpen, setIsRealWheelOpen] = useState<boolean>(false);
   const [selectionMode, setSelectionMode] = useState<'random' | 'manual'>('random');
   const [lastManualSaveId, setLastManualSaveId] = useState<string | null>(null);
 
@@ -680,15 +682,13 @@ export default function App() {
                 <button
                   id="roll-pokemon-button"
                   type="button"
-                  onClick={handleRoll}
-                  disabled={isSpinning || availableEncounters.length === 0}
+                  onClick={() => setIsRealWheelOpen(true)}
+                  disabled={availableEncounters.length === 0}
                   className={btn('primary', 'lg', 'accent', 'w-full sm:flex-1')}
                 >
-                  <Sparkles className={cn('w-5 h-5', isSpinning && 'animate-spin')} />
+                  <Sparkles className="w-5 h-5" />
                   <span>
-                    {isSpinning
-                      ? '¡Girando Ruleta...!'
-                      : availableEncounters.length === 0
+                    {availableEncounters.length === 0
                       ? 'Sin Pokémon disponibles'
                       : 'Girar Ruleta'}
                   </span>
@@ -878,14 +878,31 @@ export default function App() {
 
       {/* Manual Pokemon Picker Modal ("Elegir a dedo") */}
       {currentRoute && (
-        <ManualPokemonPickerModal
-          isOpen={isManualPickerOpen}
-          onClose={() => setIsManualPickerOpen(false)}
-          currentRoute={currentRoute}
-          availableEncounters={availableEncounters}
-          history={history}
-          onSelectPokemon={handleSelectManualPokemon}
-        />
+        <>
+          <ManualPokemonPickerModal
+            isOpen={isManualPickerOpen}
+            onClose={() => setIsManualPickerOpen(false)}
+            currentRoute={currentRoute}
+            availableEncounters={availableEncounters}
+            history={history}
+            onSelectPokemon={handleSelectManualPokemon}
+          />
+
+          <RealRouletteModal
+            isOpen={isRealWheelOpen}
+            onClose={() => setIsRealWheelOpen(false)}
+            route={currentRoute}
+            weather={selectedWeather}
+            availableEncounters={availableEncounters}
+            isWeighted={isWeighted}
+            soundEnabled={soundEnabled}
+            onConfirmCatch={(saved) => {
+              handleSaveEncounter(saved);
+              setSelectedEncounter(saved as unknown as RouteEncounter);
+              setActiveCandidate(saved.pokemon);
+            }}
+          />
+        </>
       )}
 
       <nav className={surface.bottomNav} aria-label="Navegación principal">
