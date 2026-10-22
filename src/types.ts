@@ -31,6 +31,16 @@ export interface RouteData {
   }[];
 }
 
+export type ExtraEncounterClause =
+  | 'egg'
+  | 'shiny'
+  | 'gift'
+  | 'fossil'
+  | 'trade'
+  | 'raid'
+  | 'static'
+  | 'custom';
+
 export interface SavedEncounter {
   id: string;
   timestamp: number;
@@ -47,6 +57,8 @@ export interface SavedEncounter {
   nickname?: string;
   notes?: string;
   isShiny?: boolean;
+  extraClause?: ExtraEncounterClause;
+  clauseLabel?: string;
 }
 
 export interface GameTenant {

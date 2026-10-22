@@ -30,6 +30,8 @@ import {
   Droplets,
   Plus,
   CheckCircle2,
+  Skull,
+  Heart,
 } from 'lucide-react';
 import { TypeBadge } from './TypeBadge';
 import {
@@ -71,6 +73,7 @@ interface SavedHistoryViewProps {
   onOpenTenantModal?: () => void;
   starterChoice?: StarterChoice;
   onSelectStarter?: (starter: StarterChoice) => void;
+  onOpenExtraModal?: () => void;
 }
 
 export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
@@ -83,6 +86,7 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
   onOpenTenantModal,
   starterChoice: propStarterChoice,
   onSelectStarter: propOnSelectStarter,
+  onOpenExtraModal,
 }) => {
   const { openDetail } = usePokeDetail();
   const [searchTerm, setSearchTerm] = useState('');
@@ -136,13 +140,29 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
   // Extract unique routes from history
   const uniqueRoutes = Array.from(new Set(history.map((h) => translateRouteName(h.routeName)))).sort();
 
+  // Helpers for dead vs alive status
+  const isDead = (status: SavedEncounter['status']) => status === 'Debilitado';
+  const isAlive = (status: SavedEncounter['status']) =>
+    status === 'Capturado' || status === 'En Equipo' || status === 'En Caja';
+
   // Filtered list
   const filteredHistory = history.filter((item) => {
     const matchesSearch =
       item.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.cleanName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.nickname && item.nickname.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
+    
+    let matchesStatus = true;
+    if (statusFilter === 'alive') {
+      matchesStatus = isAlive(item.status);
+    } else if (statusFilter === 'dead') {
+      matchesStatus = isDead(item.status);
+    } else if (statusFilter === 'Huido') {
+      matchesStatus = item.status === 'Huido';
+    } else if (statusFilter !== 'All') {
+      matchesStatus = item.status === statusFilter;
+    }
+
     const itemRouteName = translateRouteName(item.routeName);
     const matchesRoute = routeFilter === 'All' || itemRouteName === routeFilter || item.routeName === routeFilter;
     return matchesSearch && matchesStatus && matchesRoute;
@@ -212,7 +232,9 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
 
   // Metric stats
   const totalCount = history.length;
-  const caughtCount = history.filter((h) => h.status === 'Capturado' || h.status === 'En Equipo' || h.status === 'En Caja').length;
+  const aliveCount = history.filter((h) => isAlive(h.status)).length;
+  const deadCount = history.filter((h) => isDead(h.status)).length;
+  const escapedCount = history.filter((h) => h.status === 'Huido').length;
   const shinyCount = history.filter((h) => h.isShiny).length;
   const routesCount = uniqueRoutes.length;
 
@@ -313,12 +335,16 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
             <p className={cn(text.stat, 'mt-0.5')}>{totalCount}</p>
           </div>
           <div className={statTile('success')}>
-            <span className={text.label}>Capturados / Vivos</span>
-            <p className={cn(text.stat, 'mt-0.5')}>{caughtCount}</p>
+            <span className={cn(text.label, 'flex items-center gap-1')}>
+              <Heart className="w-3.5 h-3.5 fill-current text-status-success" /> Vivos
+            </span>
+            <p className={cn(text.stat, 'mt-0.5 text-emerald-600 dark:text-emerald-400')}>{aliveCount}</p>
           </div>
-          <div className={statTile('info')}>
-            <span className={text.label}>Rutas Exploradas</span>
-            <p className={cn(text.stat, 'mt-0.5')}>{routesCount}</p>
+          <div className={statTile('danger')}>
+            <span className={cn(text.label, 'flex items-center gap-1')}>
+              <Skull className="w-3.5 h-3.5 text-status-danger" /> Muertos / Bajas
+            </span>
+            <p className={cn(text.stat, 'mt-0.5 text-rose-600 dark:text-rose-400')}>{deadCount}</p>
           </div>
           <div className={statTile('warning')}>
             <span className={cn(text.label, 'flex items-center gap-1')}>
@@ -389,133 +415,227 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
             </div>
 
             {/* Main Starter Details & Registration */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              {/* Left: Animated Showdown Sprite & Description */}
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => openDetail('pokemon', starterMeta.species)}
-                  className={spriteFrame(true, 'w-16 h-16 sm:w-20 sm:h-20 p-2 relative group')}
-                  title={`Ver estadísticas de ${starterMeta.name}`}
-                >
-                  <img
-                    src={starterMeta.showdown}
-                    alt={starterMeta.name}
-                    className="w-14 h-14 sm:w-16 sm:h-16 object-contain group-hover:scale-110 transition-transform"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = starterMeta.sprite;
-                    }}
-                  />
-                </button>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
+            {(() => {
+              const isStarterDead = starterInHistory ? isDead(starterInHistory.status) : false;
+              return (
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  {/* Left: Animated Showdown Sprite & Description */}
+                  <div className="flex items-center gap-4">
                     <button
                       type="button"
                       onClick={() => openDetail('pokemon', starterMeta.species)}
-                      className={cn(text.sectionTitle, 'hover:text-brand-accent-ink cursor-pointer text-left transition-colors')}
+                      className={spriteFrame(true, 'w-16 h-16 sm:w-20 sm:h-20 p-2 relative group')}
                       title={`Ver estadísticas de ${starterMeta.name}`}
                     >
-                      {starterInHistory?.nickname
-                        ? `${starterInHistory.nickname} (${starterMeta.name})`
-                        : starterMeta.name}
+                      <img
+                        src={starterMeta.showdown}
+                        alt={starterMeta.name}
+                        className={cn(
+                          'w-14 h-14 sm:w-16 sm:h-16 object-contain group-hover:scale-110 transition-transform',
+                          isStarterDead && 'grayscale opacity-60 contrast-125'
+                        )}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = starterMeta.sprite;
+                        }}
+                      />
+                      {isStarterDead && (
+                        <span className="absolute -top-1 -left-1 p-0.5 rounded-full bg-status-danger text-white shadow-xs" title="Debilitado">
+                          <Skull className="w-3 h-3" />
+                        </span>
+                      )}
                     </button>
-                    <TypeBadge type={starterMeta.type} />
-                    <span className={cn(text.muted, 'font-semibold')}>
-                      Nv. 5
-                    </span>
-                  </div>
-                  <p className={cn(text.muted, 'max-w-lg')}>
-                    {starterMeta.description} • Tu rival Paúl combatirá con {starterMeta.hopStarterName} ({starterMeta.hopStarterType}).
-                  </p>
-                </div>
-              </div>
 
-              {/* Right: Registration status & edit actions */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-                {starterInHistory ? (
-                  <div className={card({ tone: 'success', padding: 'compact', extra: 'flex items-center gap-2' })}>
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <div>
-                      <span className="block text-xs font-bold">
-                        Registrado en la Bitácora
-                      </span>
-                      <span className="text-[10px]">
-                        Estado: {starterInHistory.status} • Pueblo Yarda
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => openDetail('pokemon', starterMeta.species)}
+                          className={cn(
+                            text.sectionTitle,
+                            'hover:text-brand-accent-ink cursor-pointer text-left transition-colors',
+                            isStarterDead && 'line-through text-brand-txt2'
+                          )}
+                          title={`Ver estadísticas de ${starterMeta.name}`}
+                        >
+                          {starterInHistory?.nickname
+                            ? `${starterInHistory.nickname} (${starterMeta.name})`
+                            : starterMeta.name}
+                        </button>
+                        <TypeBadge type={starterMeta.type} />
+                        <span className={cn(text.muted, 'font-semibold')}>
+                          Nv. 5
+                        </span>
+                        {isStarterDead && (
+                          <span className={pillSolid('danger', 'xs')}>
+                            <Skull className="w-3 h-3" /> Muerto
+                          </span>
+                        )}
+                      </div>
+                      <p className={cn(text.muted, 'max-w-lg')}>
+                        {starterMeta.description} • Tu rival Paúl combatirá con {starterMeta.hopStarterName} ({starterMeta.hopStarterType}).
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleRegisterStarterToHistory}
-                    className={btn('primary', 'md', 'warning')}
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Añadir Inicial a la Bitácora</span>
-                  </button>
-                )}
 
-                {starterInHistory && (
-                  <button
-                    type="button"
-                    onClick={() => handleStartEdit(starterInHistory)}
-                    className={btn('secondary', 'md')}
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Editar Mote / Estado</span>
-                  </button>
-                )}
-              </div>
-            </div>
+                  {/* Right: Registration status & quick 1-click Vivo/Muerto switch */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+                    {starterInHistory ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* 1-Click Vivo vs Muerto Switcher */}
+                        <div className="flex items-center rounded-lg border border-brand-border bg-brand-surface p-0.5 shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => onUpdate(starterInHistory.id, { status: 'Capturado' })}
+                            className={cn(
+                              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer',
+                              !isStarterDead
+                                ? 'bg-status-success text-white shadow-xs font-bold scale-[1.02]'
+                                : 'text-brand-txt2 hover:text-brand-txt1 hover:bg-brand-surface2'
+                            )}
+                            title="Marcar inicial como Vivo"
+                          >
+                            <Heart className="w-3.5 h-3.5 fill-current text-current" />
+                            <span>Vivo</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdate(starterInHistory.id, { status: 'Debilitado' })}
+                            className={cn(
+                              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer',
+                              isStarterDead
+                                ? 'bg-status-danger text-white shadow-xs font-bold scale-[1.02]'
+                                : 'text-brand-txt2 hover:text-brand-txt1 hover:bg-brand-surface2'
+                            )}
+                            title="Marcar inicial como Muerto (Debilitado)"
+                          >
+                            <Skull className="w-3.5 h-3.5 text-current" />
+                            <span>Muerto</span>
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(starterInHistory)}
+                          className={btn('secondary', 'md')}
+                          title="Editar mote o notas"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Mote</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleRegisterStarterToHistory}
+                        className={btn('primary', 'md', 'warning')}
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Añadir Inicial a la Bitácora</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
 
       {/* Filter Controls */}
-      <div className={panel('flex flex-col sm:flex-row gap-3')}>
-        <div className={field.withIcon}>
-          <Search className={field.icon} />
-          <input
-            id="history-search-input"
-            type="text"
-            placeholder="Buscar por Pokémon o mote..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className={cn(field.input, field.iconInputPad)}
-          />
+      <div className={panel('flex flex-col gap-3')}>
+        {/* Quick Status Filter Tabs: Vivo vs Muerto */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs font-bold text-brand-txt2 mr-1">Estado:</span>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('All')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 border',
+              statusFilter === 'All'
+                ? 'bg-brand-surface2 border-brand-accent text-brand-txt1 shadow-2xs font-bold'
+                : 'bg-brand-surface border-brand-border text-brand-txt2 hover:text-brand-txt1'
+            )}
+          >
+            <span>Todos</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-surface3 text-brand-txt2">{totalCount}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('alive')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 border',
+              statusFilter === 'alive'
+                ? 'bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs'
+                : 'bg-brand-surface border-brand-border text-brand-txt2 hover:text-emerald-600'
+            )}
+          >
+            <Heart className="w-3.5 h-3.5 fill-current text-emerald-500" />
+            <span>Vivos</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold">{aliveCount}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('dead')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 border',
+              statusFilter === 'dead'
+                ? 'bg-rose-500/15 border-rose-500 text-rose-700 dark:text-rose-300 font-bold shadow-2xs'
+                : 'bg-brand-surface border-brand-border text-brand-txt2 hover:text-rose-600'
+            )}
+          >
+            <Skull className="w-3.5 h-3.5 text-rose-500" />
+            <span>Muertos</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold">{deadCount}</span>
+          </button>
+
+          {escapedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter('Huido')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 border',
+                statusFilter === 'Huido'
+                  ? 'bg-amber-500/15 border-amber-500 text-amber-700 dark:text-amber-300 font-bold shadow-2xs'
+                  : 'bg-brand-surface border-brand-border text-brand-txt2 hover:text-amber-600'
+              )}
+            >
+              <span>🏃 Huidos</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">{escapedCount}</span>
+            </button>
+          )}
         </div>
 
-        <div className="flex gap-2">
-          {/* Status Filter */}
-          <select
-            id="history-status-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className={field.select}
-          >
-            <option value="All">Todos los Estados</option>
-            <option value="Capturado">Capturados</option>
-            <option value="En Equipo">En Equipo</option>
-            <option value="En Caja">En Caja</option>
-            <option value="Debilitado">Debilitados</option>
-            <option value="Huido">Huidos</option>
-          </select>
+        {/* Search & Route Filter */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-brand-border/60">
+          <div className={cn(field.withIcon, 'flex-1')}>
+            <Search className={field.icon} />
+            <input
+              id="history-search-input"
+              type="text"
+              placeholder="Buscar por Pokémon o mote..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={cn(field.input, field.iconInputPad)}
+            />
+          </div>
 
-          {/* Route Filter */}
-          <select
-            id="history-route-filter"
-            value={routeFilter}
-            onChange={(e) => setRouteFilter(e.target.value)}
-            className={field.select}
-          >
-            <option value="All">Todas las Rutas</option>
-            {uniqueRoutes.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          <div className="sm:w-64">
+            <select
+              id="history-route-filter"
+              value={routeFilter}
+              onChange={(e) => setRouteFilter(e.target.value)}
+              className={field.select}
+            >
+              <option value="All">Todas las Rutas ({uniqueRoutes.length})</option>
+              {uniqueRoutes.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -525,17 +645,20 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
           <div className={emptyState.bubble}>
             <Compass className="w-7 h-7" />
           </div>
-          <h3 className={emptyState.title}>No hay encuentros guardados todavía</h3>
+          <h3 className={emptyState.title}>No hay encuentros que coincidan</h3>
           <p className={emptyState.hint}>
-            Selecciona una ruta en la ruleta, genera tu Pokémon aleatorio y haz clic en &quot;Guardar este Encuentro en el Historial&quot;.
+            Prueba a cambiar el filtro de estado o los términos de búsqueda.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
           {filteredHistory.map((item) => {
-            const { displayName, types } = parsePokemonName(item.pokemon);
+            const { displayName } = parsePokemonName(item.pokemon);
             const { sprite } = getPokemonSprite(item.pokemon);
             const isEditing = editingId === item.id;
+            const isPokemonDead = isDead(item.status);
+            const isPokemonAlive = isAlive(item.status);
+            const isPokemonEscaped = item.status === 'Huido';
 
             return (
               <div
@@ -543,19 +666,59 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
                 id={`history-item-${item.id}`}
                 className={card({
                   interactive: true,
-                  extra: 'relative overflow-hidden flex flex-col justify-between',
+                  extra: cn(
+                    'relative overflow-hidden flex flex-col justify-between transition-all duration-200',
+                    isPokemonDead && 'border-status-danger/40 bg-status-danger/5 dark:bg-status-danger/10 shadow-2xs'
+                  ),
                 })}
               >
-                {/* Header: Route & Date */}
-                <div className="flex items-center justify-between text-xs pb-3 border-b border-brand-border">
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-brand-txt1">
+                {/* Header: Route, Date & 1-Click Vivo/Muerto Switcher */}
+                <div className="flex items-center justify-between gap-2 text-xs pb-3 border-b border-brand-border flex-wrap">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-brand-txt1 min-w-0">
                     <Compass className="w-3.5 h-3.5 text-brand-accent shrink-0" />
                     <span className="truncate">{translateRouteName(item.routeName)}</span>
-                  </span>
-                  <span className={cn(text.meta, 'flex items-center gap-1 shrink-0')}>
-                    <Calendar className="w-3 h-3" />
-                    {new Date(item.timestamp).toLocaleDateString()}
-                  </span>
+                    <span className={cn(text.meta, 'hidden sm:inline-flex items-center gap-1 ml-1')}>
+                      • {new Date(item.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  {/* Direct 1-Click Vivo vs Muerto Switcher */}
+                  <div className="flex items-center rounded-lg border border-brand-border bg-brand-surface p-0.5 shadow-2xs shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUpdate(item.id, { status: 'Capturado' });
+                      }}
+                      className={cn(
+                        'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer',
+                        isPokemonAlive
+                          ? 'bg-status-success text-white shadow-xs font-bold scale-[1.02]'
+                          : 'text-brand-txt2 hover:text-brand-txt1 hover:bg-brand-surface2'
+                      )}
+                      title="Marcar como Vivo"
+                    >
+                      <Heart className="w-3 h-3 fill-current text-current" />
+                      <span>Vivo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUpdate(item.id, { status: 'Debilitado' });
+                      }}
+                      className={cn(
+                        'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer',
+                        isPokemonDead
+                          ? 'bg-status-danger text-white shadow-xs font-bold scale-[1.02]'
+                          : 'text-brand-txt2 hover:text-brand-txt1 hover:bg-brand-surface2'
+                      )}
+                      title="Marcar como Muerto (Debilitado)"
+                    >
+                      <Skull className="w-3 h-3 text-current" />
+                      <span>Muerto</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Content */}
@@ -564,8 +727,6 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
                     type="button"
                     onClick={() => openDetail('pokemon', item.cleanName)}
                     className={cn(
-                      // The shiny badge overflows the frame, so this one cannot use
-                      // `spriteFrame()` (it clips with `overflow-hidden`).
                       'w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-brand-surface border border-brand-border',
                       'flex items-center justify-center p-1 relative shrink-0 cursor-pointer group',
                       'transition-all duration-150 hover:border-brand-accent/50 hover:scale-105',
@@ -576,11 +737,19 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
                     <img
                       src={sprite}
                       alt={displayName}
-                      className="w-12 h-12 sm:w-14 sm:h-14 object-contain group-hover:scale-110 transition-transform"
+                      className={cn(
+                        'w-12 h-12 sm:w-14 sm:h-14 object-contain group-hover:scale-110 transition-transform',
+                        isPokemonDead && 'grayscale opacity-60 contrast-125'
+                      )}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.opacity = '0.3';
                       }}
                     />
+                    {isPokemonDead && (
+                      <span className="absolute -top-1 -left-1 p-0.5 rounded-full bg-status-danger text-white shadow-xs" title="Debilitado / Muerto">
+                        <Skull className="w-3 h-3" />
+                      </span>
+                    )}
                     {item.isShiny && (
                       <span className={cn('absolute -top-1 -right-1 p-0.5 rounded-full', TONES.warning.solid)}>
                         <Sparkles className="w-3 h-3 fill-current" />
@@ -593,22 +762,46 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
                       <button
                         type="button"
                         onClick={() => openDetail('pokemon', item.cleanName)}
-                        className={cn(text.cardTitle, 'hover:text-brand-accent-ink truncate cursor-pointer text-left transition-colors')}
+                        className={cn(
+                          text.cardTitle,
+                          'hover:text-brand-accent-ink truncate cursor-pointer text-left transition-colors',
+                          isPokemonDead && 'line-through text-brand-txt2'
+                        )}
                         title={`Ver detalles de ${displayName}`}
                       >
                         {item.nickname ? `${item.nickname} (${displayName})` : displayName}
                       </button>
                       {isStarterEncounter(item) && (
-                        <span className={pillSolid('warning')}>
+                        <span className={pillSolid('warning', 'xs')}>
                           ★ Inicial
+                        </span>
+                      )}
+                      {isPokemonDead && (
+                        <span className={pillSolid('danger', 'xs')}>
+                          💀 Muerto
+                        </span>
+                      )}
+                      {isPokemonEscaped && (
+                        <span className={pillSolid('warning', 'xs')}>
+                          🏃 Huido
                         </span>
                       )}
                     </div>
 
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      <span className={pill(statusColors[item.status])}>
-                        {item.status}
-                      </span>
+                      {isPokemonDead ? (
+                        <span className={pill('danger')}>
+                          💀 Muerto en combate
+                        </span>
+                      ) : isPokemonEscaped ? (
+                        <span className={pill('warning')}>
+                          🏃 No capturado
+                        </span>
+                      ) : (
+                        <span className={pill('success')}>
+                          💚 Vivo
+                        </span>
+                      )}
                       <span className={pill('neutral', 'sm')}>
                         {item.method} • {item.chance}%
                       </span>
@@ -647,11 +840,9 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
                           onChange={(e) => setEditStatus(e.target.value as SavedEncounter['status'])}
                           className={field.select}
                         >
-                          <option value="Capturado">Capturado</option>
-                          <option value="En Equipo">En Equipo</option>
-                          <option value="En Caja">En Caja</option>
-                          <option value="Debilitado">Debilitado</option>
-                          <option value="Huido">Huido</option>
+                          <option value="Capturado">💚 Vivo (Capturado)</option>
+                          <option value="Debilitado">💀 Muerto (Debilitado)</option>
+                          <option value="Huido">🏃 Huido (No capturado)</option>
                         </select>
                       </div>
                     </div>
@@ -691,7 +882,7 @@ export const SavedHistoryView: React.FC<SavedHistoryViewProps> = ({
                       onClick={() => handleStartEdit(item)}
                       className={btn('ghost', 'xs', 'neutral')}
                     >
-                      <Edit3 className="w-3.5 h-3.5" /> Editar
+                      <Edit3 className="w-3.5 h-3.5" /> Editar Mote
                     </button>
                     {confirmDeleteId === item.id ? (
                       <div className={confirmBox}>

@@ -47,6 +47,7 @@ import {
   Flame,
   Droplets,
   MapPin,
+  Skull,
 } from 'lucide-react';
 
 interface StoryRouteCardProps {
@@ -416,7 +417,7 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   type="button"
-                  onClick={() => openDetail('pokemon', caughtMeta.cleanName)}
+                  onClick={() => openDetail('pokemon', savedEncounter.pokemon)}
                   className={spriteFrame(true, cn('w-16 h-16 p-1 bg-white/5 shrink-0 group', isFailed && 'opacity-75 grayscale-[40%]'))}
                   title={`Haz clic para ver detalles de ${caughtMeta.displayName}`}
                 >
@@ -437,7 +438,7 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => openDetail('pokemon', caughtMeta.cleanName)}
+                      onClick={() => openDetail('pokemon', savedEncounter.pokemon)}
                       className={cn(
                         'font-bold text-base hover:text-brand-accent transition-colors text-left',
                         isFailed ? 'text-brand-txt2 line-through' : 'text-brand-txt1'
@@ -445,7 +446,11 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                     >
                       {caughtMeta.displayName}
                     </button>
-                    {isFailed ? (
+                    {savedEncounter.status === 'Debilitado' ? (
+                      <span className={pillSolid('danger', 'xs')}>
+                        <Skull className="w-3 h-3" /> Muerto
+                      </span>
+                    ) : isFailed ? (
                       <span className={pillSolid('danger', 'xs')}>
                         <XCircle className="w-3 h-3" /> Se escapó
                       </span>
@@ -656,7 +661,7 @@ export const StoryRouteCard: React.FC<StoryRouteCardProps> = ({
                         <button
                           key={enc.pokemon}
                           type="button"
-                          onClick={() => openDetail('pokemon', meta.cleanName)}
+                          onClick={() => openDetail('pokemon', enc.pokemon)}
                           title={`Ver detalles de ${meta.displayName}`}
                           className={card({
                             interactive: true,

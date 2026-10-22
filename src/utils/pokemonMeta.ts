@@ -444,175 +444,231 @@ export function parsePokemonName(rawName: string): {
   let formLabel: string | undefined = undefined;
   let apiName = trimmed.toLowerCase();
 
-  // Handle specific suffixes from Romhack format
-  if (trimmed === 'Zigzagoon-1') {
+  // Helper to normalize apostrophes
+  const normalized = trimmed.replace(/’/g, "'");
+
+  // 1. Handle specific suffixes from Romhack format (-1, -2)
+  if (normalized === 'Zigzagoon-1') {
     cleanName = 'Zigzagoon';
     formLabel = 'Galar';
     apiName = 'zigzagoon-galar';
-  } else if (trimmed === 'Meowth-1') {
+  } else if (normalized === 'Meowth-1') {
     cleanName = 'Meowth';
     formLabel = 'Alola';
     apiName = 'meowth-alola';
-  } else if (trimmed === 'Meowth-2') {
+  } else if (normalized === 'Meowth-2') {
     cleanName = 'Meowth';
     formLabel = 'Galar';
     apiName = 'meowth-galar';
-  } else if (trimmed === 'Persian-1') {
+  } else if (normalized === 'Persian-1') {
     cleanName = 'Persian';
     formLabel = 'Alola';
     apiName = 'persian-alola';
-  } else if (trimmed === 'Farfetch’d-1' || trimmed === "Farfetch'd-1") {
+  } else if (normalized === "Farfetch'd-1") {
     cleanName = "Farfetch'd";
     formLabel = 'Galar';
     apiName = 'farfetchd-galar';
-  } else if (trimmed === 'Darumaka-1') {
+  } else if (normalized === 'Darumaka-1') {
     cleanName = 'Darumaka';
     formLabel = 'Galar';
     apiName = 'darumaka-galar';
-  } else if (trimmed === 'Darmanitan-2') {
+  } else if (normalized === 'Darmanitan-2') {
     cleanName = 'Darmanitan';
     formLabel = 'Galar';
     apiName = 'darmanitan-galar';
-  } else if (trimmed === 'Mr. Mime-1') {
+  } else if (normalized === 'Mr. Mime-1' || normalized === 'Mr-Mime-1') {
     cleanName = 'Mr. Mime';
     formLabel = 'Galar';
     apiName = 'mr-mime-galar';
-  } else if (trimmed === 'Corsola-1') {
+  } else if (normalized === 'Corsola-1') {
     cleanName = 'Corsola';
     formLabel = 'Galar';
     apiName = 'corsola-galar';
-  } else if (trimmed === 'Slowpoke-1') {
+  } else if (normalized === 'Slowpoke-1') {
     cleanName = 'Slowpoke';
     formLabel = 'Galar';
     apiName = 'slowpoke-galar';
-  } else if (trimmed === 'Ponyta-1') {
+  } else if (normalized === 'Ponyta-1') {
     cleanName = 'Ponyta';
     formLabel = 'Galar';
     apiName = 'ponyta-galar';
-  } else if (trimmed === 'Rapidash-1' || trimmed === 'G-Rapidash') {
+  } else if (normalized === 'Rapidash-1' || normalized === 'G-Rapidash') {
     cleanName = 'Rapidash';
     formLabel = 'Galar';
     apiName = 'rapidash-galar';
-  } else if (trimmed === 'Lycanroc Day') {
-    cleanName = 'Lycanroc';
-    formLabel = 'Forma Diurna';
-    apiName = 'lycanroc';
-  } else if (trimmed === 'Lycanroc Dusk') {
-    cleanName = 'Lycanroc';
-    formLabel = 'Forma Crepuscular';
-    apiName = 'lycanroc-dusk';
-  } else if (trimmed === 'Lycanroc Night') {
-    cleanName = 'Lycanroc';
-    formLabel = 'Forma Nocturna';
-    apiName = 'lycanroc-midnight';
-  } else if (trimmed === 'Weezing-1') {
+  } else if (normalized === 'Weezing-1') {
     cleanName = 'Weezing';
     formLabel = 'Galar';
     apiName = 'weezing-galar';
-  } else if (trimmed === 'Yamask-1') {
+  } else if (normalized === 'Yamask-1') {
     cleanName = 'Yamask';
     formLabel = 'Galar';
     apiName = 'yamask-galar';
-  } else if (trimmed === 'Stunfisk-1') {
+  } else if (normalized === 'Stunfisk-1') {
     cleanName = 'Stunfisk';
     formLabel = 'Galar';
     apiName = 'stunfisk-galar';
-  } else if (trimmed === 'Vulpix-1') {
+  } else if (normalized === 'Vulpix-1') {
     cleanName = 'Vulpix';
     formLabel = 'Alola';
     apiName = 'vulpix-alola';
-  } else if (trimmed === 'Ninetales-1') {
+  } else if (normalized === 'Ninetales-1') {
     cleanName = 'Ninetales';
     formLabel = 'Alola';
     apiName = 'ninetales-alola';
-  } else if (trimmed === 'Sandshrew-1') {
+  } else if (normalized === 'Sandshrew-1') {
     cleanName = 'Sandshrew';
     formLabel = 'Alola';
     apiName = 'sandshrew-alola';
-  } else if (trimmed === 'Sandslash-1') {
+  } else if (normalized === 'Sandslash-1') {
     cleanName = 'Sandslash';
     formLabel = 'Alola';
     apiName = 'sandslash-alola';
-  } else if (trimmed === 'Dugtrio-1') {
+  } else if (normalized === 'Dugtrio-1') {
     cleanName = 'Dugtrio';
     formLabel = 'Alola';
     apiName = 'dugtrio-alola';
-  } else if (trimmed === 'Shellos-1') {
+  } else if (normalized === 'Shellos-1') {
     cleanName = 'Shellos';
     formLabel = 'Mar Este';
     apiName = 'shellos-east';
-  } else if (trimmed === 'Gastrodon-1') {
+  } else if (normalized === 'Gastrodon-1') {
     cleanName = 'Gastrodon';
     formLabel = 'Mar Este';
     apiName = 'gastrodon-east';
-  } else if (trimmed === 'Basculin-1') {
+  } else if (normalized === 'Basculin-1') {
     cleanName = 'Basculin';
     formLabel = 'Raya Azul';
     apiName = 'basculin-blue-striped';
-  } else if (trimmed === 'Indeedee-1') {
+  } else if (normalized === 'Indeedee-1') {
     cleanName = 'Indeedee';
     formLabel = 'Hembra';
     apiName = 'indeedee-female';
-  } else if (trimmed === 'Weezing-Galar' || trimmed === 'Galarian Weezing') {
-    cleanName = 'Weezing';
-    formLabel = 'Galar';
-    apiName = 'weezing-galar';
-  } else if (trimmed === 'Toxtricity-Low-Key' || trimmed === 'Toxtricity-Lowkey') {
+  } else if (normalized === 'Lycanroc Day') {
+    cleanName = 'Lycanroc';
+    formLabel = 'Forma Diurna';
+    apiName = 'lycanroc';
+  } else if (normalized === 'Lycanroc Dusk') {
+    cleanName = 'Lycanroc';
+    formLabel = 'Forma Crepuscular';
+    apiName = 'lycanroc-dusk';
+  } else if (normalized === 'Lycanroc Night') {
+    cleanName = 'Lycanroc';
+    formLabel = 'Forma Nocturna';
+    apiName = 'lycanroc-midnight';
+  } else if (normalized === 'Toxtricity-Low-Key' || normalized === 'Toxtricity-Lowkey') {
     cleanName = 'Toxtricity';
     formLabel = 'Grave';
     apiName = 'toxtricity-low-key';
-  } else if (trimmed === 'Zygarde-10%' || trimmed === 'Zygarde 10%') {
+  } else if (normalized === 'Zygarde-10%' || normalized === 'Zygarde 10%') {
     cleanName = 'Zygarde';
     formLabel = '10%';
     apiName = 'zygarde-10';
-  } else if (trimmed === 'Rotom-Ghost') {
+  } else if (normalized === 'Rotom-Ghost') {
     cleanName = 'Rotom';
     formLabel = 'Fantasma';
     apiName = 'rotom';
-  } else if (trimmed === 'Cherrim (Overcast)' || trimmed === 'Cherrim-Overcast') {
+  } else if (normalized === 'Cherrim (Overcast)' || normalized === 'Cherrim-Overcast') {
     cleanName = 'Cherrim';
     formLabel = 'Nuboso';
     apiName = 'cherrim-overcast';
-  } else if (trimmed === 'Centiskorch-G') {
+  } else if (normalized === 'Centiskorch-G') {
     cleanName = 'Centiskorch';
     formLabel = 'Gigamax';
     apiName = 'centiskorch-gmax';
-  } else if (/-(gmax|dmax)$/i.test(trimmed)) {
-    const isGmax = /gmax$/i.test(trimmed);
-    cleanName = trimmed.replace(/-(gmax|dmax)$/i, '');
+  } else if (/-(gmax|dmax)$/i.test(normalized)) {
+    const isGmax = /gmax$/i.test(normalized);
+    cleanName = normalized.replace(/-(gmax|dmax)$/i, '');
     formLabel = isGmax ? 'Gigamax' : 'Dinamax';
     apiName = isGmax ? `${cleanName.toLowerCase()}-gmax` : cleanName.toLowerCase();
-  } else if (trimmed.startsWith('Pumpkaboo-')) {
+  } else if (normalized.startsWith('Pumpkaboo-')) {
     cleanName = 'Pumpkaboo';
-    const formNum = trimmed.split('-')[1];
+    const formNum = normalized.split('-')[1];
     formLabel = formNum === '1' ? 'Tamaño Pequeño' : formNum === '2' ? 'Tamaño Grande' : 'Tamaño Extragrande';
     apiName = 'pumpkaboo-average';
+  }
+  // 2. Generalized Galar matching (e.g. Slowbro-Galar, Slowpoke-Galar, Slowking-Galar, Weezing-Galar, Galarian Slowpoke, etc.)
+  else if (/(\bgalar\b|galarian)/i.test(normalized)) {
+    formLabel = 'Galar';
+    cleanName = normalized
+      .replace(/^galarian\s+/i, '')
+      .replace(/[\s-_]+(galar|galarian)$/i, '')
+      .replace(/\s*\((galar|galarian)\)/i, '')
+      .trim();
+    // Capitalize cleanName
+    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    if (cleanName.toLowerCase() === 'farfetchd') cleanName = "Farfetch'd";
+    if (cleanName.toLowerCase() === 'mr-mime' || cleanName.toLowerCase() === 'mr mime') cleanName = 'Mr. Mime';
+    const slugBase = cleanName.toLowerCase().replace(/['’.:]/g, '').replace(/\s+/g, '-');
+    apiName = `${slugBase}-galar`;
+  }
+  // 3. Generalized Alola matching (e.g. Vulpix-Alola, Alolan Vulpix, Raichu (Alola), etc.)
+  else if (/(\balola\b|alolan)/i.test(normalized)) {
+    formLabel = 'Alola';
+    cleanName = normalized
+      .replace(/^alolan\s+/i, '')
+      .replace(/[\s-_]+(alola|alolan)$/i, '')
+      .replace(/\s*\((alola|alolan)\)/i, '')
+      .trim();
+    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    const slugBase = cleanName.toLowerCase().replace(/['’.:]/g, '').replace(/\s+/g, '-');
+    apiName = `${slugBase}-alola`;
+  }
+  // 4. Generalized Hisui matching
+  else if (/(\bhisui\b|hisuian)/i.test(normalized)) {
+    formLabel = 'Hisui';
+    cleanName = normalized
+      .replace(/^hisuian\s+/i, '')
+      .replace(/[\s-_]+(hisui|hisuian)$/i, '')
+      .replace(/\s*\((hisui|hisuian)\)/i, '')
+      .trim();
+    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    const slugBase = cleanName.toLowerCase().replace(/['’.:]/g, '').replace(/\s+/g, '-');
+    apiName = `${slugBase}-hisui`;
+  }
+  // 5. Generalized Paldea matching
+  else if (/(\bpaldea\b|paldean)/i.test(normalized)) {
+    formLabel = 'Paldea';
+    cleanName = normalized
+      .replace(/^paldean\s+/i, '')
+      .replace(/[\s-_]+(paldea|paldean)$/i, '')
+      .replace(/\s*\((paldea|paldean)\)/i, '')
+      .trim();
+    cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    const slugBase = cleanName.toLowerCase().replace(/['’.:]/g, '').replace(/\s+/g, '-');
+    apiName = `${slugBase}-paldea`;
   }
 
   // Determine types based on form
   let types = TYPE_MAP[cleanName.toLowerCase()] || ['Normal'];
   if (formLabel === 'Galar') {
-    if (cleanName === 'Zigzagoon') types = ['Dark', 'Normal'];
+    if (cleanName === 'Zigzagoon' || cleanName === 'Linoone') types = ['Dark', 'Normal'];
     if (cleanName === 'Meowth') types = ['Steel'];
-    if (cleanName === "Farfetch'd") types = ['Fighting'];
-    if (cleanName === 'Darumaka') types = ['Ice'];
-    if (cleanName === 'Darmanitan') types = ['Ice'];
+    if (cleanName === "Farfetch'd" || cleanName === 'Farfetchd') types = ['Fighting'];
+    if (cleanName === 'Darumaka' || cleanName === 'Darmanitan') types = ['Ice'];
     if (cleanName === 'Mr. Mime') types = ['Ice', 'Psychic'];
     if (cleanName === 'Corsola') types = ['Ghost'];
     if (cleanName === 'Slowpoke') types = ['Psychic'];
+    if (cleanName === 'Slowbro' || cleanName === 'Slowking') types = ['Poison', 'Psychic'];
     if (cleanName === 'Ponyta') types = ['Psychic'];
     if (cleanName === 'Rapidash') types = ['Psychic', 'Fairy'];
     if (cleanName === 'Weezing') types = ['Poison', 'Fairy'];
     if (cleanName === 'Yamask') types = ['Ground', 'Ghost'];
     if (cleanName === 'Stunfisk') types = ['Ground', 'Steel'];
+    if (cleanName === 'Articuno') types = ['Psychic', 'Flying'];
+    if (cleanName === 'Zapdos') types = ['Fighting', 'Flying'];
+    if (cleanName === 'Moltres') types = ['Dark', 'Flying'];
   } else if (formLabel === 'Alola') {
-    if (cleanName === 'Meowth') types = ['Dark'];
-    if (cleanName === 'Persian') types = ['Dark'];
+    if (cleanName === 'Meowth' || cleanName === 'Persian') types = ['Dark'];
     if (cleanName === 'Vulpix') types = ['Ice'];
     if (cleanName === 'Ninetales') types = ['Ice', 'Fairy'];
-    if (cleanName === 'Sandshrew') types = ['Ice', 'Steel'];
-    if (cleanName === 'Sandslash') types = ['Ice', 'Steel'];
-    if (cleanName === 'Dugtrio') types = ['Ground', 'Steel'];
+    if (cleanName === 'Sandshrew' || cleanName === 'Sandslash') types = ['Ice', 'Steel'];
+    if (cleanName === 'Dugtrio' || cleanName === 'Diglett') types = ['Ground', 'Steel'];
+    if (cleanName === 'Raichu') types = ['Electric', 'Psychic'];
+    if (cleanName === 'Marowak') types = ['Fire', 'Ghost'];
+    if (cleanName === 'Exeggutor') types = ['Grass', 'Dragon'];
+    if (cleanName === 'Grimer' || cleanName === 'Muk') types = ['Poison', 'Dark'];
+    if (cleanName === 'Geodude' || cleanName === 'Graveler' || cleanName === 'Golem') types = ['Rock', 'Electric'];
   }
 
   const displayName = formLabel ? `${cleanName} (${formLabel})` : cleanName;

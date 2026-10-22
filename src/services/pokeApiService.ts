@@ -100,6 +100,8 @@ const SWSH_EXTRA_FORMS = [
 
 function titleCaseSlug(slug: string): string {
   if (DEX_DISPLAY_OVERRIDES[slug]) return DEX_DISPLAY_OVERRIDES[slug];
+  const parsed = parsePokemonName(slug);
+  if (parsed.formLabel) return parsed.displayName;
   return slug
     .split('-')
     .map((word) => (word.length ? word.charAt(0).toUpperCase() + word.slice(1) : word))
@@ -479,6 +481,8 @@ interface EvolutionDetailLike {
   turn_upside_down?: boolean;
   version_group?: { name: string } | null;
   is_default?: boolean;
+  required_pokemon_form?: { name: string; url: string } | null;
+  evolved_pokemon_form?: { name: string; url: string } | null;
   base_form?: { name: string; url: string } | null;
   evolved_form?: { name: string; url: string } | null;
 }
@@ -497,11 +501,20 @@ function resourceIdFromUrl(url?: string): number | null {
 
 function formRegion(slug?: string | null): 'galar' | 'alola' | 'hisui' | 'paldea' | null {
   if (!slug) return null;
-  if (slug.includes('galar')) return 'galar';
-  if (slug.includes('alola')) return 'alola';
-  if (slug.includes('hisui')) return 'hisui';
-  if (slug.includes('paldea')) return 'paldea';
+  const clean = slug.toLowerCase();
+  if (clean.includes('galar')) return 'galar';
+  if (clean.includes('alola')) return 'alola';
+  if (clean.includes('hisui')) return 'hisui';
+  if (clean.includes('paldea')) return 'paldea';
   return null;
+}
+
+function getDetailBaseForm(d: EvolutionDetailLike): string | undefined {
+  return d.required_pokemon_form?.name || d.base_form?.name;
+}
+
+function getDetailEvolvedForm(d: EvolutionDetailLike): string | undefined {
+  return d.evolved_pokemon_form?.name || d.evolved_form?.name;
 }
 
 function evolutionItemLabel(slug: string): string {
@@ -581,8 +594,10 @@ function formatEvolutionRequirement(detail: EvolutionDetailLike): { text: string
 
 function matchesCurrentForm(_details: EvolutionDetailLike[], currentSlug: string, detail: EvolutionDetailLike): boolean {
   const currentRegion = formRegion(currentSlug);
-  const baseRegion = formRegion(detail.base_form?.name);
-  const evoRegion = formRegion(detail.evolved_form?.name);
+  const baseReq = getDetailBaseForm(detail);
+  const evoReq = getDetailEvolvedForm(detail);
+  const baseRegion = formRegion(baseReq);
+  const evoRegion = formRegion(evoReq);
 
   if (currentRegion) {
     if (baseRegion || evoRegion) {
@@ -600,7 +615,7 @@ function pickGen8EvolutionDetails(details: EvolutionDetailLike[], currentSlug: s
   if (!formMatched.length) {
     if (currentRegion) return [];
     const allRegional = details.every(
-      (d) => formRegion(d.base_form?.name) || formRegion(d.evolved_form?.name)
+      (d) => formRegion(getDetailBaseForm(d)) || formRegion(getDetailEvolvedForm(d))
     );
     if (allRegional) return [];
   }
@@ -627,6 +642,8 @@ function pickGen8EvolutionDetails(details: EvolutionDetailLike[], currentSlug: s
       d.known_move_type?.name,
       d.time_of_day,
       d.gender,
+      getDetailBaseForm(d),
+      getDetailEvolvedForm(d),
     ].join('|');
     if (seen.has(key)) return false;
     seen.add(key);
@@ -638,19 +655,11 @@ function evolutionArtworkUrl(id: number): string {
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
 }
 
-function evolutionSpriteUrl(detail: EvolutionDetailLike, speciesUrl: string): string {
-  const id =
-    resourceIdFromUrl(detail.evolved_form?.url) ||
-    resourceIdFromUrl(speciesUrl) ||
-    0;
-  return evolutionArtworkUrl(id);
-}
-
-function previousEvolutionSpriteUrl(detail: EvolutionDetailLike, speciesUrl: string): string {
-  const id =
-    resourceIdFromUrl(detail.base_form?.url) ||
-    resourceIdFromUrl(speciesUrl) ||
-    0;
+function evolutionSpriteUrl(targetSlug: string, detail: EvolutionDetailLike, speciesUrl: string): string {
+  // Always use getPokemonSprite which returns working Showdown sprites for standard & regional Pokémon
+  const showdownSprite = getPokemonSprite(targetSlug).sprite;
+  if (showdownSprite) return showdownSprite;
+  const id = resourceIdFromUrl(speciesUrl) || 0;
   return evolutionArtworkUrl(id);
 }
 
@@ -719,7 +728,9 @@ async function getPokemonEvolutionLine(
       }
       if (!details.length) break;
 
-      const parentSlug = details[0].base_form?.name || found.parent.species.name;
+      const parentSlug =
+        getDetailBaseForm(details[0]) ||
+        found.parent.species.name;
       if (!inSwsh(parentSlug, found.parent.species.name)) break;
 
       const { requirement, itemSlug } = formatEvolutionEntry(details);
@@ -728,7 +739,7 @@ async function getPokemonEvolutionLine(
       previous.push({
         slug: parentSlug,
         name: displayName,
-        sprite: previousEvolutionSpriteUrl(details[0], found.parent.species.url),
+        sprite: evolutionSpriteUrl(parentSlug, details[0], found.parent.species.url),
         fromName: titleCaseSlug(childSlug),
         stage: previous.length + 1,
         requirement,
@@ -748,7 +759,9 @@ async function getPokemonEvolutionLine(
         const details = pickGen8EvolutionDetails(nextNode.evolution_details || [], currentSlug);
         if (!details.length) continue;
 
-        const targetSlug = details[0].evolved_form?.name || nextNode.species.name;
+        const targetSlug =
+          getDetailEvolvedForm(details[0]) ||
+          nextNode.species.name;
         if (!inSwsh(targetSlug, nextNode.species.name)) continue;
 
         const { requirement, itemSlug } = formatEvolutionEntry(details);
@@ -757,7 +770,7 @@ async function getPokemonEvolutionLine(
         next.push({
           slug: targetSlug,
           name: displayName,
-          sprite: evolutionSpriteUrl(details[0], nextNode.species.url),
+          sprite: evolutionSpriteUrl(targetSlug, details[0], nextNode.species.url),
           fromName: fromDisplay,
           stage,
           requirement,
@@ -1116,7 +1129,7 @@ export async function getPokemonDetails(pokemonNameOrSlug: string): Promise<Poke
       id: pokemon.id,
       slug: normalized,
       name: pokemon.name,
-      displayName: pokemonNameOrSlug,
+      displayName: parsed.displayName || titleCaseSlug(pokemon.name),
       types,
       sprites: {
         artwork,

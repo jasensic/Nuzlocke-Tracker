@@ -241,7 +241,7 @@ export const EncounterResultCard: React.FC<EncounterResultCardProps> = ({
               </h2>
               <button
                 type="button"
-                onClick={() => openDetail('pokemon', cleanName)}
+                onClick={() => openDetail('pokemon', encounter.pokemon)}
                 className={btn('soft', 'xs', 'info')}
                 title={`Ver estadísticas base, habilidades y datos de ${displayName}`}
               >
